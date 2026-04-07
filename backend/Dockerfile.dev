@@ -1,0 +1,14 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies first (layer cache)
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+EXPOSE 3001
+
+# Hot-reload development mode
+CMD ["npm", "run", "start:dev"]

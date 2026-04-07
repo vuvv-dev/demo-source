@@ -1,0 +1,44 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: apple-store-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_DB: apple_store
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d apple_store']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: apple-store-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/apple_store
+      JWT_SECRET: apple-store-secret-key
+      PORT: 3001
+      NODE_ENV: development
+    ports:
+      - '3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - /app/dist
+
+volumes:
+  postgres_data:
