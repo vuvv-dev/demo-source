@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Star, ShoppingCart, Tag, Heart, Package } from 'lucide-react';
+import { Star, ShoppingCart, Heart, Package } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
 import { Product } from '@/types';
 import { useCartStore } from '@/store/cartStore';
@@ -53,17 +53,21 @@ export default function ProductCard({ product }: { product: Product }) {
             sizes="(max-width: 768px) 50vw, 25vw"
           />
 
-          {/* Discount */}
-          {discount && (
-            <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[#ff3b30] text-white text-[11px] font-bold shadow-sm flex items-center gap-1 z-10">
-              <Tag size={9} /> -{discount}%
+          {/* New badge */}
+          {discount ? (
+            <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-[#0071e3] text-white text-[10px] font-semibold z-10">
+              Giảm {discount}%%
+            </div>
+          ) : (
+            <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-[#1d1d1f]/80 backdrop-blur-sm text-white text-[10px] font-semibold z-10">
+              Mới
             </div>
           )}
 
           {/* Wishlist heart */}
           <button
             onClick={handleWishlist}
-            className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 shadow-sm z-10 bg-white/90 backdrop-blur-sm hover:bg-white active:scale-90"
+            className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 z-10 bg-white/90 backdrop-blur-sm hover:bg-white active:scale-90 border border-white/50"
             style={{ color: isWishlisted ? '#ff3b30' : '#86868b' }}
             aria-label="Yêu thích"
           >
@@ -82,7 +86,7 @@ export default function ProductCard({ product }: { product: Product }) {
             <div className="absolute bottom-3 right-3 z-10 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
               <button
                 onClick={handleAddToCart}
-                className="w-10 h-10 rounded-full bg-[#0071e3] text-white flex items-center justify-center shadow-[0_4px_12px_rgba(0,113,227,0.4)] hover:bg-[#0077ed] active:scale-90 transition-all duration-200"
+                className="w-10 h-10 rounded-full bg-white text-[#1d1d1f] flex items-center justify-center shadow-[0_1px_4px_rgba(0,0,0,0.12)] hover:bg-[#0071e3] hover:text-white active:scale-90 transition-all duration-200 border border-gray-200"
                 aria-label="Thêm vào giỏ hàng"
               >
                 <ShoppingCart size={16} />
@@ -112,24 +116,29 @@ export default function ProductCard({ product }: { product: Product }) {
             {product.name}
           </h3>
 
-          {/* Rating */}
-          {product.averageRating && (
-            <div className="flex items-center gap-1.5 mt-2.5">
-              <div className="flex gap-0.5">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Star
-                    key={i}
-                    size={11}
-                    style={{
-                      fill: i <= Math.round(Number(product.averageRating)) ? '#f5c518' : '#e5e5e7',
-                      color: i <= Math.round(Number(product.averageRating)) ? '#f5c518' : '#e5e5e7',
-                    }}
-                  />
-                ))}
+          {/* Rating - Fixed height container to prevent collapse */}
+          <div className="min-h-[22px] mt-2.5">
+            {product.averageRating ? (
+              <div className="flex items-center gap-1.5 transition-all">
+                <div className="flex gap-0.5">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Star
+                      key={i}
+                      size={11}
+                      style={{
+                        fill: i <= Math.round(Number(product.averageRating)) ? '#f5c518' : '#e5e5e7',
+                        color: i <= Math.round(Number(product.averageRating)) ? '#f5c518' : '#e5e5e7',
+                      }}
+                    />
+                  ))}
+                </div>
+                <span className="text-[11px] text-[#86868b]">({product.reviewCount})</span>
               </div>
-              <span className="text-[11px] text-[#86868b]">({product.reviewCount})</span>
-            </div>
-          )}
+            ) : (
+              // Empty placeholder to maintain symmetry
+              <div className="h-[14px]" />
+            )}
+          </div>
 
           {/* Price */}
           <div className="mt-3 flex items-end justify-between">

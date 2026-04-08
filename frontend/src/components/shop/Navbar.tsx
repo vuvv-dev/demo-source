@@ -303,11 +303,8 @@ export default function Navbar() {
           <div className={`flex items-center transition-all duration-300 ${searchOpen ? 'h-[56px]' : 'h-14'}`}>
 
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 mr-8 shrink-0 group">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#1d1d1f] to-[#3d3d3d] flex items-center justify-center text-white transition-transform group-hover:scale-105">
-                <AppleLogo />
-              </div>
-              <span className="font-bold text-base text-[#1d1d1f] tracking-tight hidden sm:block">AppleStore</span>
+            <Link href="/" className="flex items-center justify-center mr-6 shrink-0 text-[#1d1d1f] hover:opacity-70 transition-opacity duration-200">
+              <AppleLogo />
             </Link>
 
             {/* Desktop Nav */}
@@ -466,7 +463,7 @@ export default function Navbar() {
           <div className="fixed top-0 left-0 right-0 z-[61] bg-white rounded-b-3xl shadow-[0_8px_40px_rgba(0,0,0,0.15)] animate-slide-down">
             <div className="max-w-2xl mx-auto px-4 pt-6 pb-6">
               {/* Search input row */}
-              <div className={`pl-2 flex items-center gap-3 rounded-2xl border transition-all duration-200 ${searchFocused ? 'border-[#0071e3] ring-2 ring-[#0071e3]/20' : 'border-gray-200'
+              <div className={`pl-4 flex items-center gap-3 rounded-2xl border transition-all duration-200 ${searchFocused ? 'border-[#0071e3] ring-2 ring-[#0071e3]/20' : 'border-gray-200'
                 }`}>
                 <SearchIcon size={18} />
                 <input

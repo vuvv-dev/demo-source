@@ -38,7 +38,10 @@
       "Bash(dir:*)",
       "Bash(taskkill /F /IM node.exe)",
       "Bash(python3:*)",
-      "WebFetch(domain:www.apple.com)"
+      "WebFetch(domain:www.apple.com)",
+      "Bash(npx typescript:*)",
+      "Bash(node -e \"require\\('fs'\\).readFileSync\\('src/app/\\(shop\\)/page.tsx','utf8'\\)\")",
+      "Bash(node:*)"
     ]
   }
 }

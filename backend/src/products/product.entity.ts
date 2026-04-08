@@ -38,6 +38,18 @@ export class Product {
   @Column({ type: 'simple-json', default: '{}' })
   specs: Record<string, string>;
 
+  @Column({ nullable: true })
+  tagline: string;
+
+  @Column({ nullable: true })
+  featuredImage: string;
+
+  @Column({ type: 'text', nullable: true })
+  whatsInTheBox: string;
+
+  @Column({ type: 'simple-json', default: '{}' })
+  extraMetadata: Record<string, any>;
+
   @ManyToOne(() => Category, (category) => category.products, { eager: true })
   @JoinColumn()
   category: Category;

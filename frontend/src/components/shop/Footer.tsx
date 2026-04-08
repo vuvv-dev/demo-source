@@ -68,33 +68,6 @@ const footerSections = [
       ],
     }
   },
-  {
-    title: 'Dành Cho Chăm Sóc Sức Khỏe',
-    links: [
-      { label: 'Apple trong Chăm Sóc Sức Khỏe', href: '#' },
-      { label: 'Sức khỏe trên Apple Watch', href: '#' },
-    ],
-    next: {
-      title: 'Giá Trị Cốt Lõi',
-      links: [
-        { label: 'Trợ Năng', href: '#' },
-        { label: 'Môi Trường', href: '#' },
-        { label: 'Quyền Riêng Tư', href: '#' },
-        { label: 'Chuỗi Cung Ứng', href: '#' },
-      ],
-    }
-  },
-  {
-    title: 'Về Apple',
-    links: [
-      { label: 'Newsroom', href: '#' },
-      { label: 'Lãnh Đạo Của Apple', href: '#' },
-      { label: 'Nhà Đầu Tư', href: '#' },
-      { label: 'Đạo Đức & Quy Tắc', href: '#' },
-      { label: 'Sự Kiện', href: '#' },
-      { label: 'Liên Hệ Apple', href: '#' },
-    ],
-  },
 ];
 
 export default function Footer() {

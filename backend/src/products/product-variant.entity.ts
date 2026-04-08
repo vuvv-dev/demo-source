@@ -17,7 +17,7 @@ export class ProductVariant {
   value: string; // e.g. "Đen Midnight", "256GB"
 
   // Price modifier relative to product base price (can be negative for discounts)
-  @Column({ type: 'decimal', precision: 15, scale: 0, default: 0 })
+  @Column({ type: 'decimal', precision: 15, scale: 0, default: 0, transformer: { to: Number, from: Number } })
   priceModifier: number;
 
   @Column({ default: 0 })

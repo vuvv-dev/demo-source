@@ -49,7 +49,6 @@ export class ProductsService {
       return { data: [], total, page: +page, limit: +limit, success: true };
     }
 
-    // Fix N+1: batch-fetch ratings for all products in this page with 1 query
     const ids = products.map((p) => p.id);
     const ratingResults = await this.reviewRepo
       .createQueryBuilder('r')
@@ -64,12 +63,12 @@ export class ProductsService {
       ratingResults.map((r: any) => [r.productId, r]),
     );
 
-    const data = products.map((p) => {
+    const data = products.map((p: any) => {
       const r = ratingMap.get(p.id);
       return {
         ...p,
         averageRating: r ? parseFloat(parseFloat(r.avgRating).toFixed(1)) : null,
-        reviewCount: r ? parseInt(r.reviewCount) : 0,
+        reviewCount: r ? parseInt(String(r.reviewCount)) : 0,
       };
     });
 
@@ -77,30 +76,56 @@ export class ProductsService {
   }
 
   async findOne(idOrSlug: string) {
-    const product = await this.repo.findOne({
-      where: [{ id: idOrSlug }, { slug: idOrSlug }],
-      relations: ['reviews', 'reviews.user', 'variants'],
-    });
-    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+    try {
+      const product = await this.repo.findOne({
+        where: [{ id: idOrSlug }, { slug: idOrSlug }],
+        relations: ['reviews', 'reviews.user', 'variants'],
+      });
+      if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
-    const ratingResult = await this.reviewRepo
-      .createQueryBuilder('r')
-      .select('AVG(r.rating)', 'avgRating')
-      .addSelect('COUNT(r.id)', 'reviewCount')
-      .where('r.productId = :id', { id: product.id })
-      .getRawOne();
+      const ratingResult = await this.reviewRepo
+        .createQueryBuilder('r')
+        .select('AVG(r.rating)', 'avgRating')
+        .addSelect('COUNT(r.id)', 'reviewCount')
+        .where('r.productId = :id', { id: product.id })
+        .getRawOne();
 
-    const avgRating = ratingResult?.avgRating
-      ? parseFloat(parseFloat(ratingResult.avgRating).toFixed(1))
-      : null;
-    const reviewCount = ratingResult?.reviewCount
-      ? parseInt(String(ratingResult.reviewCount))
-      : 0;
+      const avgRating = ratingResult?.avgRating
+        ? parseFloat(parseFloat(ratingResult.avgRating).toFixed(1))
+        : null;
+      const reviewCount = ratingResult?.reviewCount
+        ? parseInt(String(ratingResult.reviewCount))
+        : 0;
 
-    return {
-      data: { ...product, averageRating: avgRating, reviewCount },
-      success: true,
-    };
+      // Return plain object to avoid TypeORM entity proxy issues
+      const data = {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        description: product.description,
+        price: Number(product.price),
+        originalPrice: product.originalPrice != null ? Number(product.originalPrice) : null,
+        images: product.images,
+        stock: product.stock,
+        sold: product.sold,
+        isActive: product.isActive,
+        specs: product.specs,
+        tagline: product.tagline,
+        featuredImage: product.featuredImage,
+        whatsInTheBox: product.whatsInTheBox,
+        extraMetadata: product.extraMetadata,
+        category: product.category,
+        variants: product.variants,
+        averageRating: avgRating,
+        reviewCount,
+        createdAt: product.createdAt,
+      };
+
+      return { data, success: true };
+    } catch (err) {
+      console.error('[findOne] error:', err);
+      throw err;
+    }
   }
 
   async create(dto: CreateProductDto) {

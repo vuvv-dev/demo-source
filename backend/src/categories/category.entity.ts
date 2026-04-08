@@ -18,6 +18,9 @@ export class Category {
   @Column({ nullable: true })
   image: string;
 
+  @Column({ type: 'simple-json', default: '{}' })
+  metadata: Record<string, any>;
+
   @OneToMany(() => Product, (product) => product.category)
   products: Product[];
 
