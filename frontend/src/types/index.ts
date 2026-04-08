@@ -10,6 +10,11 @@ export interface Category {
   description?: string; image?: string;
 }
 
+export interface ProductVariant {
+  id: string; name: string; value: string;
+  priceModifier: number; stock: number; isActive: boolean;
+}
+
 export interface Product {
   id: string; name: string; slug: string;
   description: string; price: number; originalPrice?: number;
@@ -17,6 +22,7 @@ export interface Product {
   isActive: boolean; specs: Record<string, string>;
   category: Category; averageRating?: string | null;
   reviewCount?: number; createdAt: string;
+  variants?: ProductVariant[];
 }
 
 export interface CartItem {

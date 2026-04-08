@@ -29,6 +29,9 @@ export class User {
   @Column({ nullable: true })
   avatar: string;
 
+  @Column({ nullable: true, type: 'text' })
+  refreshToken: string;
+
   @OneToOne(() => Cart, (cart) => cart.user)
   cart: Cart;
 

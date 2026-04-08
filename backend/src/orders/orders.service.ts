@@ -56,6 +56,7 @@ export class OrdersService {
       totalAmount,
       shippingAddress: dto.shippingAddress,
       paymentMethod: dto.paymentMethod,
+      paymentStatus: 'pending',
       note: dto.note,
     });
     const saved = await this.orderRepo.save(order);
@@ -66,7 +67,13 @@ export class OrdersService {
 
     await this.cartItemRepo.delete({ cart: { id: cart.id } });
 
-    return { data: await this.findOne(saved.id, userId), success: true, message: 'Đặt hàng thành công' };
+    const orderData = await this.findOne(saved.id, userId);
+    // For COD / bank_transfer: done immediately
+    if (dto.paymentMethod !== 'stripe') {
+      return { data: orderData, success: true, message: 'Đặt hàng thành công' };
+    }
+    // For stripe: frontend should call /payments/create-checkout-session next
+    return { data: orderData, success: true, message: 'Đặt hàng thành công — vui lòng hoàn tất thanh toán', requiresPayment: true };
   }
 
   async findAll(userId: string, isAdmin: boolean, page = 1, limit = 10, status?: string) {

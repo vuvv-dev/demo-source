@@ -2,9 +2,9 @@ import AdminSidebar from '@/components/admin/AdminSidebar';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#ffffff' }}>
+    <div className="flex min-h-screen bg-white">
       <AdminSidebar />
-      <main style={{ flex: 1, marginLeft: '240px', padding: '2rem', minHeight: '100vh' }}>
+      <main className="flex-1 ml-60 p-8 min-h-screen">
         {children}
       </main>
     </div>

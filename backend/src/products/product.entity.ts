@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, OneToOne, JoinColumn } from 'typeorm';
 import { Category } from '../categories/category.entity';
 import { Review } from '../reviews/review.entity';
+import { ProductVariant } from './product-variant.entity';
 
 @Entity('products')
 export class Product {
@@ -16,10 +17,10 @@ export class Product {
   @Column({ type: 'text' })
   description: string;
 
-  @Column({ type: 'decimal', precision: 15, scale: 0 })
+  @Column({ type: 'decimal', precision: 15, scale: 0, transformer: { to: Number, from: Number } })
   price: number;
 
-  @Column({ type: 'decimal', precision: 15, scale: 0, nullable: true })
+  @Column({ type: 'decimal', precision: 15, scale: 0, nullable: true, transformer: { to: Number, from: Number } })
   originalPrice: number;
 
   @Column({ type: 'simple-json', default: '[]' })
@@ -43,6 +44,9 @@ export class Product {
 
   @OneToMany(() => Review, (review) => review.product)
   reviews: Review[];
+
+  @OneToMany(() => ProductVariant, (v) => v.product, { cascade: true, eager: true })
+  variants: ProductVariant[];
 
   @CreateDateColumn()
   createdAt: Date;

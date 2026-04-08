@@ -34,7 +34,10 @@
       "Bash(xargs -r ps -p)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f''''BE OK - {len\\(d[data]\\)} products''''\\)\")",
       "Bash(git rm:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(dir:*)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(python3:*)"
     ]
   }
 }

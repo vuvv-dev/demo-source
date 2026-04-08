@@ -39,9 +39,26 @@ export class AuthService {
     return this.buildResponse(user);
   }
 
+  async refreshToken(userId: string) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('Người dùng không tồn tại');
+    return this.buildResponse(user);
+  }
+
+  async logout(userId: string) {
+    await this.userRepo.update(userId, { refreshToken: null });
+    return { success: true, message: 'Đăng xuất thành công' };
+  }
+
   private buildResponse(user: User) {
-    const { password, ...userData } = user;
+    const { password, refreshToken, ...userData } = user as any;
     const accessToken = this.jwtService.sign({ sub: user.id, email: user.email, role: user.role });
-    return { data: { user: userData, accessToken }, success: true, message: 'Thành công' };
+    const refreshToken_ = this.jwtService.sign(
+      { sub: user.id, type: 'refresh' },
+      { secret: process.env.JWT_SECRET || 'apple-store-secret-key', expiresIn: '30d' },
+    );
+    // Store hashed RT in DB
+    this.userRepo.update(user.id, { refreshToken: refreshToken_ });
+    return { data: { user: userData, accessToken, refreshToken: refreshToken_ }, success: true, message: 'Thành công' };
   }
 }

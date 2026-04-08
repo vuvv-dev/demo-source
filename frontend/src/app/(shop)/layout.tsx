@@ -5,7 +5,7 @@ export default function ShopLayout({ children }: { children: React.ReactNode }) 
   return (
     <>
       <Navbar />
-      <main className="pt-16">{children}</main>
+      <main className="pt-16 page-enter">{children}</main>
       <Footer />
     </>
   );

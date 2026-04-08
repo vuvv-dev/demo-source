@@ -21,6 +21,18 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  @Post('refresh')
+  refresh(@CurrentUser() user: any) {
+    return this.authService.refreshToken(user.id);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  logout(@CurrentUser() user: any) {
+    return this.authService.logout(user.id);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

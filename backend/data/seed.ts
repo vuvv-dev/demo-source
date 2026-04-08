@@ -9,11 +9,12 @@ import { OrderItem } from '../src/orders/order-item.entity';
 import { Cart } from '../src/cart/cart.entity';
 import { CartItem } from '../src/cart/cart-item.entity';
 import { Review } from '../src/reviews/review.entity';
+import { ProductVariant } from '../src/products/product-variant.entity';
 
 const dataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL || 'postgresql://postgres:postgres123@localhost:5432/apple_store',
-  entities: [User, Category, Product, Order, OrderItem, Cart, CartItem, Review],
+  entities: [User, Category, Product, ProductVariant, Order, OrderItem, Cart, CartItem, Review],
   synchronize: true,
   logging: false,
 });
