@@ -10,6 +10,9 @@ export class Order {
   @Column({ unique: true })
   orderNumber: string;
 
+  @Column({ type: 'bigint', unique: true, nullable: true })
+  orderCode: number;
+
   @ManyToOne(() => User, (user) => user.orders, { eager: true })
   @JoinColumn()
   user: User;

@@ -39,7 +39,7 @@ function SuccessContent() {
     const orderId = params.get('order_id');
     if (orderId) {
       setItems([]);
-      toast.success('Thanh toán thành công qua Stripe!');
+      toast.success('Đặt hàng và thanh toán thành công! 🎉');
       router.replace(`/orders/${orderId}`);
     } else if (sessionId) {
       toast.success('Thanh toán thành công!');

@@ -2,37 +2,17 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from '../orders/order.entity';
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const Stripe = require('stripe');
-
-// Inline type definitions to avoid Stripe v22 namespace resolution issues
-interface LineItemParams {
-  price_data: {
-    currency: string;
-    product_data: {
-      name: string;
-      images?: string[];
-    };
-    unit_amount: number;
-  };
-  quantity: number;
-}
-
-interface CheckoutSession {
-  id: string;
-  url: string | null;
-  metadata: Record<string, string> | null;
-}
+import { PayOS } from '@payos/node';
 
 @Injectable()
 export class PaymentService {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private stripe: any;
+  private payos: PayOS;
 
   constructor(@InjectRepository(Order) private orderRepo: Repository<Order>) {
-    this.stripe = new (Stripe as any)(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
-      apiVersion: '2025-02-24.acacia',
+    this.payos = new PayOS({
+      clientId: process.env.PAYOS_CLIENT_ID || '',
+      apiKey: process.env.PAYOS_API_KEY || '',
+      checksumKey: process.env.PAYOS_CHECKSUM_KEY || '',
     });
   }
 
@@ -44,63 +24,50 @@ export class PaymentService {
 
     if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
     if (order.user.id !== userId) throw new NotFoundException('Đơn hàng không tồn tại');
-    if (order.paymentMethod !== 'stripe') throw new BadRequestException('Sai phương thức thanh toán');
+    if (order.paymentMethod !== 'payos') throw new BadRequestException('Sai phương thức thanh toán');
 
-    const lineItems: LineItemParams[] = order.items.map(item => ({
-      price_data: {
-        currency: 'vnd',
-        product_data: {
-          name: item.productName,
-          images: item.productImage ? [item.productImage] : [],
-        },
-        unit_amount: Math.round(Number(item.price) * 100),
-      },
-      quantity: item.quantity,
-    }));
-
-    const session: CheckoutSession = await this.stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: lineItems,
-      mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/checkout/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/checkout?canceled=true`,
-      metadata: { orderId: order.id, userId },
-      customer_email: order.user.email,
-    });
-
-    return { data: { sessionId: session.id, url: session.url }, success: true };
-  }
-
-  async handleWebhook(payload: Buffer, sig: string) {
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (!webhookSecret) {
-      console.warn('STRIPE_WEBHOOK_SECRET not configured');
-      return { received: true };
-    }
-
-    try {
-      this.stripe.webhooks.constructEvent(payload, sig, webhookSecret);
-    } catch (err) {
-      throw new BadRequestException(`Webhook signature verification failed`);
-    }
-
-    // Parse event manually to avoid Stripe namespace issues
-    const event = JSON.parse(payload.toString()) as {
-      type: string;
-      data: { object: CheckoutSession };
+    const body = {
+      orderCode: Number(order.orderCode),
+      amount: Math.round(Number(order.totalAmount)),
+      description: `Thanh toán đơn hàng ${order.orderNumber}`,
+      items: order.items.map(item => ({
+        name: item.productName,
+        quantity: item.quantity,
+        price: Math.round(Number(item.price)),
+      })),
+      returnUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/checkout/success?order_id=${orderId}`,
+      cancelUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/checkout?canceled=true`,
     };
 
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-      const { orderId } = session.metadata || {};
-      if (orderId) {
-        await this.orderRepo.update(orderId, {
-          paymentStatus: 'paid',
-          status: 'confirmed',
-        });
-      }
+    try {
+      const paymentLink = await this.payos.paymentRequests.create(body);
+      return { data: { checkoutUrl: paymentLink.checkoutUrl, orderCode: body.orderCode }, success: true };
+    } catch (error) {
+      console.error('PayOS error:', error);
+      throw new BadRequestException('Không thể tạo liên kết thanh toán');
     }
+  }
 
-    return { received: true };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async handleWebhook(body: any) {
+    try {
+      // PayOS verification
+      const verifiedData = await this.payos.webhooks.verify(body);
+      
+      // PayOS sends status in its payload
+      if (verifiedData.code === '00' || body.success === true) {
+        const orderCode = verifiedData.orderCode;
+        if (orderCode) {
+          await this.orderRepo.update({ orderCode }, {
+            paymentStatus: 'paid',
+            status: 'confirmed',
+          });
+        }
+      }
+      return { success: true };
+    } catch (err) {
+      console.error('Webhook processing error:', err);
+      return { success: false, message: 'Invalid webhook data' };
+    }
   }
 }

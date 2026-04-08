@@ -18,7 +18,7 @@ export class PaymentController {
   }
 
   @Post('webhook')
-  handleWebhook(@Req() req: RawBodyRequest<Request>, @Headers('stripe-signature') sig: string) {
-    return this.service.handleWebhook(req.rawBody, sig);
+  handleWebhook(@Body() body: any) {
+    return this.service.handleWebhook(body);
   }
 }

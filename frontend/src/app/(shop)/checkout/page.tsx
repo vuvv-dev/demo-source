@@ -28,11 +28,11 @@ export default function CheckoutPage() {
         paymentMethod: form.paymentMethod, note: form.note,
       });
 
-      if (form.paymentMethod === 'stripe' && res.data.requiresPayment) {
+      if (form.paymentMethod === 'payos' && res.data.requiresPayment) {
         const sessionRes = await paymentsApi.createCheckoutSession(res.data.data.id);
-        const stripeUrl = sessionRes.data.data.url;
-        if (stripeUrl) {
-          window.location.href = stripeUrl;
+        const checkoutUrl = sessionRes.data.data.checkoutUrl;
+        if (checkoutUrl) {
+          window.location.href = checkoutUrl;
           return;
         }
       }
@@ -125,7 +125,7 @@ export default function CheckoutPage() {
                   {[
                     { value: 'cod', label: 'Thanh toán khi nhận hàng (COD)', icon: Truck, desc: 'Trả tiền mặt khi nhận được hàng' },
                     { value: 'bank_transfer', label: 'Chuyển khoản ngân hàng', icon: CreditCard, desc: 'Chuyển khoản trước qua tài khoản ngân hàng' },
-                    { value: 'stripe', label: 'Thanh toán bằng thẻ (Stripe)', icon: Lock, desc: 'Thanh toán an toàn qua Stripe' },
+                    { value: 'payos', label: 'Thanh toán QR (payOS)', icon: Lock, desc: 'Thanh toán nhanh bằng mã VietQR' },
                   ].map(opt => (
                     <label key={opt.value} className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${form.paymentMethod === opt.value
                         ? 'border-[#0071e3] bg-[#eff6ff]'

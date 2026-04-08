@@ -104,13 +104,11 @@ export default function Footer() {
         {/* Footnotes */}
         <section className="text-[12px] text-[#86868b] border-b border-[#d2d2d7] pb-4 mb-4 leading-relaxed space-y-3">
           <p>
-            1. Apple Intelligence khả dụng ở phiên bản beta trên tất cả các kiểu máy iPhone 16, iPhone 15 Pro, iPhone 15 Pro Max, cũng như iPad và Mac trang bị chip M1 trở lên, với ngôn ngữ Siri và thiết bị được đặt thành tiếng Anh (Mỹ), như một bản cập nhật phần mềm iOS 18, iPadOS 18 và macOS Sequoia. Các ngôn ngữ và nền tảng khác sẽ được bổ sung vào năm sau.
-          </p>
-          <p>
+            Apple Intelligence khả dụng ở phiên bản beta trên tất cả các kiểu máy iPhone 16, iPhone 15 Pro, iPhone 15 Pro Max, cũng như iPad và Mac trang bị chip M1 trở lên, với ngôn ngữ Siri và thiết bị được đặt thành tiếng Anh (Mỹ), như một bản cập nhật phần mềm iOS 18, iPadOS 18 và macOS Sequoia. Các ngôn ngữ và nền tảng khác sẽ được bổ sung vào năm sau.
             Dịch vụ đổi cũ lấy mới do các đối tác đổi cũ lấy mới của Apple cung cấp. Giá trị đổi cũ lấy mới chỉ là giá ước tính và giá trị thực tế có thể thấp hơn.
-          </p>
-          <p>
             Để truy cập và sử dụng tất cả các tính năng của Apple Card, bạn phải thêm Apple Card vào Ví trên iPhone hoặc iPad chạy phiên bản iOS hoặc iPadOS mới nhất.
+            <br />※ Chỉ dành cho người đăng ký mới. 65.000đ/tháng sau khi hết hạn dùng thử. Ưu đãi dành cho người mới đăng ký Apple Music sử dụng thiết bị mới hợp lệ, chỉ trong khoảng thời gian có hạn. Chương trình đổi ưu đãi dành cho các thiết bị nghe hợp lệ yêu cầu phải kết nối hoặc ghép nối với một thiết bị Apple đang chạy hệ điều hành iOS hoặc iPadOS mới nhất. Chương trình đổi ưu đãi dành cho Apple Watch yêu cầu phải kết nối hoặc ghép nối với một iPhone đang chạy hệ điều hành iOS mới nhất. Ưu đãi có hiệu lực trong 3 tháng sau khi kích hoạt thiết bị hợp lệ. Chỉ áp dụng một ưu đãi cho mỗi Tài khoản Apple, bất kể số lượng thiết bị hợp lệ mà bạn mua. Gói đăng ký sẽ tự động gia hạn cho đến khi bị hủy. Có áp dụng hạn chế và các điều khoản khác.
+            <br />± Apple Intelligence khả dụng ở phiên bản beta. Một số tính năng không khả dụng ở một số khu vực hoặc ngôn ngữ. Để biết tính năng và ngôn ngữ khả dụng cũng như yêu cầu hệ thống, hãy truy cập support.apple.com/121115(Mở trong cửa sổ mới).
           </p>
         </section>
 

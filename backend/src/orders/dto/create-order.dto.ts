@@ -10,7 +10,7 @@ export class ShippingAddressDto {
 
 export class CreateOrderDto {
   @ValidateNested() @Type(() => ShippingAddressDto) shippingAddress: ShippingAddressDto;
-  @IsString() paymentMethod: 'cod' | 'bank_transfer' | 'credit_card' | 'stripe' = 'cod';
+  @IsString() paymentMethod: 'cod' | 'bank_transfer' | 'credit_card' | 'stripe' | 'payos' = 'cod';
   @IsOptional() @IsString() note?: string;
 }
 

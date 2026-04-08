@@ -18,11 +18,12 @@ export class OrdersService {
     @InjectRepository(Product) private productRepo: Repository<Product>,
   ) {}
 
-  private generateOrderNumber(): string {
+  private generateOrderNumbers() {
     const date = new Date();
-    const dateStr = `${date.getFullYear()}${String(date.getMonth()+1).padStart(2,'0')}${String(date.getDate()).padStart(2,'0')}`;
+    const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
     const rand = Math.floor(10000 + Math.random() * 90000);
-    return `APL-${dateStr}-${rand}`;
+    const orderCode = Number(`${dateStr}${rand}`);
+    return { orderNumber: `APL-${dateStr}-${rand}`, orderCode };
   }
 
   async create(userId: string, dto: CreateOrderDto) {
@@ -50,8 +51,10 @@ export class OrdersService {
       await this.productRepo.update(product.id, { stock: product.stock - item.quantity, sold: product.sold + item.quantity });
     }
 
+    const { orderNumber, orderCode } = this.generateOrderNumbers();
     const order = this.orderRepo.create({
-      orderNumber: this.generateOrderNumber(),
+      orderNumber,
+      orderCode,
       user: { id: userId } as any,
       totalAmount,
       shippingAddress: dto.shippingAddress,
@@ -69,11 +72,11 @@ export class OrdersService {
 
     const orderData = await this.findOne(saved.id, userId);
     // For COD / bank_transfer: done immediately
-    if (dto.paymentMethod !== 'stripe') {
-      return { data: orderData, success: true, message: 'Đặt hàng thành công' };
+    // For payos: frontend should call /payments/create-checkout-session next
+    if (dto.paymentMethod === 'payos') {
+      return { data: orderData, success: true, message: 'Đặt hàng thành công — vui lòng hoàn tất thanh toán', requiresPayment: true };
     }
-    // For stripe: frontend should call /payments/create-checkout-session next
-    return { data: orderData, success: true, message: 'Đặt hàng thành công — vui lòng hoàn tất thanh toán', requiresPayment: true };
+    return { data: orderData, success: true, message: 'Đặt hàng thành công' };
   }
 
   async findAll(userId: string, isAdmin: boolean, page = 1, limit = 10, status?: string) {

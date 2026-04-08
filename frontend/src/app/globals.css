@@ -449,6 +449,53 @@ body {
 .animate-chip-float-1 { animation: chipFloat1 6s ease-in-out infinite; }
 .animate-chip-float-2 { animation: chipFloat2 8s ease-in-out infinite; }
 
+/* ─── Header nav ───────────────────────────────────────────────── */
+.nav-item-link {
+  position: relative;
+}
+.nav-item-link::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: #1d1d1f;
+  transition: width 0.2s ease;
+}
+.nav-item-link:hover::after,
+.nav-item-link.active::after { width: 100%; }
+
+/* ─── Mega dropdown animation ───────────────────────────────────── */
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.mega-dropdown {
+  animation: dropdownIn 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+/* ─── Header search bar ─────────────────────────────────────────── */
+.header-search-transition {
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* ─── Dropdown overlay backdrop ─────────────────────────────────── */
+.dropdown-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: transparent;
+}
+
+/* ─── Search modal animations ───────────────────────────────────── */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-down { animation: slideDown 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
+.animate-fade-in-fast { animation: fadeIn 0.2s ease both; }
+
 /* ─── Product card enhancements ─────────────────────────────── */
 .product-card {
   @apply bg-white rounded-2xl border border-[#f0f0f0] overflow-hidden transition-all duration-300;
