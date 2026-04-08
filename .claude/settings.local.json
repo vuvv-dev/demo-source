@@ -41,7 +41,20 @@
       "WebFetch(domain:www.apple.com)",
       "Bash(npx typescript:*)",
       "Bash(node -e \"require\\('fs'\\).readFileSync\\('src/app/\\(shop\\)/page.tsx','utf8'\\)\")",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(echo \"Backend PID: $!\")",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //PID 30344)",
+      "Bash(echo \"Started PID: $!\")",
+      "Bash(taskkill //F //PID 29968)",
+      "Bash(echo \"New PID: $!\")",
+      "Bash(grep -v \"^\\\\\\\\[\")",
+      "Bash(taskkill //F //PID 18876)",
+      "Bash(taskkill //F //PID 17088)",
+      "Bash(taskkill //F //PID 30468)",
+      "Bash(taskkill //F //PID 20468)",
+      "Bash(taskkill //F //PID 1968)"
     ]
   }
 }

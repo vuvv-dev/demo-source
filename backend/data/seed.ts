@@ -158,7 +158,21 @@ async function seed() {
     { name: 'AirPods Pro 2', slug: 'ap-pro-2', price: 5990000, cat: 'airpods' },
 
     // --- Accessories (40 items) ---
-    { name: 'Ốp Lưng Silicon MagSafe iPhone 17 Pro', slug: 'case-silicon-17p', price: 1390000, cat: 'phu-kien', tagline: 'Gắn vào. Khoe ra.', img: 'https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=800', hasColors: true },
+    { 
+      name: 'Ốp Lưng Silicon MagSafe iPhone 17 - Ối Đào', 
+      slug: 'case-silicon-17-peach', 
+      price: 1390000, 
+      cat: 'phu-kien', 
+      tagline: 'Gắn vào. Khoe ra.', 
+      img: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/MA7E4?wid=1144&hei=1144&fmt=jpeg&qlt=90&.v=1723930438344',
+      box: 'Ốp Lưng Silicon MagSafe cho iPhone 17',
+      hasColors: true,
+      meta: {
+        compatibility: ['iPhone 17'],
+        bannerCopy: 'Lớp vỏ ngoài bằng silicon mềm mại, mượt mà tạo cảm giác tuyệt vời khi cầm trên tay. Ở bên nội thất, lớp lót sợi siêu mịn giúp bảo vệ iPhone tốt hơn.',
+        bannerImg: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/iphone-16-silicone-case-with-magsafe-plum-lifestyle-202409?wid=1000&hei=1000&fmt=jpeg&qlt=90&.v=1723930432549'
+      }
+    },
     { name: 'Ốp Lưng FineWoven iPhone 17 Pro Max', slug: 'case-fine-17pm', price: 1690000, cat: 'phu-kien', tagline: 'Vải dệt cao cấp.', img: 'https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=800' },
     { name: 'Dây đeo Ocean Apple Watch', slug: 'strap-ocean', price: 2490000, cat: 'phu-kien', tagline: 'Cho những chuyến lặn biển.' },
     { name: 'Dây đeo Alpine Loop', slug: 'strap-alpine', price: 2490000, cat: 'phu-kien' },

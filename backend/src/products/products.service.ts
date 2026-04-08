@@ -18,27 +18,73 @@ export class ProductsService {
   ) {}
 
   async findAll(query: QueryProductDto) {
-    const { page = 1, limit = 12, search, categoryId, categorySlug, minPrice, maxPrice, sortBy = 'newest' } = query;
+    const {
+      page = 1,
+      limit = 12,
+      search,
+      categoryId,
+      categorySlug,
+      minPrice,
+      maxPrice,
+      sortBy = 'popular',
+      order = 'desc',
+      minRating,
+      inStock = 'all',
+    } = query;
 
     const qb = this.repo
       .createQueryBuilder('p')
       .leftJoinAndSelect('p.category', 'c')
+      .leftJoin('p.reviews', 'r')
+      .groupBy('p.id')
+      .addGroupBy('c.id')
       .where('p.isActive = :isActive', { isActive: true });
 
-    if (search) qb.andWhere('p.name LIKE :search', { search: `%${search}%` });
+    // ── Full-text search: name, description, tagline
+    if (search) {
+      const keyword = `%${search}%`;
+      qb.andWhere(
+        `(p.name ILIKE :kw OR p.description ILIKE :kw OR p.tagline ILIKE :kw)`,
+        { kw: keyword },
+      );
+    }
+
+    // Category filter
     if (categoryId) qb.andWhere('c.id = :categoryId', { categoryId });
     if (categorySlug) qb.andWhere('c.slug = :categorySlug', { categorySlug });
-    if (minPrice) qb.andWhere('p.price >= :minPrice', { minPrice });
-    if (maxPrice) qb.andWhere('p.price <= :maxPrice', { maxPrice });
 
-    const orderMap: Record<string, Record<string, 'ASC' | 'DESC'>> = {
-      price_asc: { 'p.price': 'ASC' },
-      price_desc: { 'p.price': 'DESC' },
-      newest: { 'p.createdAt': 'DESC' },
-      popular: { 'p.sold': 'DESC' },
-    };
-    const order = orderMap[sortBy] || orderMap.newest;
-    Object.entries(order).forEach(([col, dir]) => qb.addOrderBy(col, dir));
+    // Price range
+    if (minPrice != null) qb.andWhere('p.price >= :minPrice', { minPrice });
+    if (maxPrice != null) qb.andWhere('p.price <= :maxPrice', { maxPrice });
+
+    // Stock filter
+    if (inStock === 'in_stock') qb.andWhere('p.stock > 0');
+    else if (inStock === 'out_of_stock') qb.andWhere('p.stock <= 0');
+
+    // ── Sort — rating/sold/newest use JS post-sort after ratingMap is built
+    const dir: 'ASC' | 'DESC' = order === 'asc' ? 'ASC' : 'DESC';
+
+    switch (sortBy) {
+      case 'price_asc':
+        qb.orderBy('p.price', 'ASC').addOrderBy('p.createdAt', 'DESC');
+        break;
+      case 'price_desc':
+        qb.orderBy('p.price', 'DESC').addOrderBy('p.createdAt', 'DESC');
+        break;
+      case 'newest':
+        qb.orderBy('p.createdAt', dir).addOrderBy('p.name', 'ASC');
+        break;
+      case 'rating':
+        // Sort after ratingMap is available (see post-processing below)
+        break;
+      case 'sold':
+        qb.orderBy('p.sold', dir).addOrderBy('p.name', dir === 'ASC' ? 'ASC' : 'DESC');
+        break;
+      case 'popular':
+      default:
+        qb.orderBy('p.sold', 'DESC').addOrderBy('p.createdAt', 'DESC');
+        break;
+    }
 
     const [products, total] = await qb
       .skip((page - 1) * limit)
@@ -50,6 +96,8 @@ export class ProductsService {
     }
 
     const ids = products.map((p) => p.id);
+
+    // ── Get review counts (separate from avg to avoid alias conflicts)
     const ratingResults = await this.reviewRepo
       .createQueryBuilder('r')
       .select('r.productId', 'productId')
@@ -63,7 +111,9 @@ export class ProductsService {
       ratingResults.map((r: any) => [r.productId, r]),
     );
 
-    const data = products.map((p: any) => {
+    // ── Build final data — attach computed fields
+    // p.category is auto-populated by leftJoinAndSelect
+    let data = products.map((p: any) => {
       const r = ratingMap.get(p.id);
       return {
         ...p,
@@ -72,60 +122,71 @@ export class ProductsService {
       };
     });
 
+    // ── Post-query rating filter (applied after pagination)
+    if (minRating != null) {
+      data = data.filter((p) => p.averageRating != null && p.averageRating >= minRating);
+    }
+
+    // ── Post-query sorts — nulls always last
+    if (sortBy === 'rating') {
+      data.sort((a, b) => {
+        if (a.averageRating == null && b.averageRating == null) return 0;
+        if (a.averageRating == null) return 1;
+        if (b.averageRating == null) return -1;
+        return dir === 'ASC' ? a.averageRating - b.averageRating : b.averageRating - a.averageRating;
+      });
+    } else if (sortBy === 'sold' && dir === 'ASC') {
+      data.sort((a, b) => a.sold - b.sold);
+    }
+
     return { data, total, page: +page, limit: +limit, success: true };
   }
 
   async findOne(idOrSlug: string) {
     try {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const isUuid = uuidRegex.test(idOrSlug);
+
+      // Build where clause: for UUID, try id+slug; for slug strings, only slug (avoids cast error)
+      const where = isUuid
+        ? [{ id: idOrSlug }, { slug: idOrSlug }]
+        : [{ slug: idOrSlug }];
+
       const product = await this.repo.findOne({
-        where: [{ id: idOrSlug }, { slug: idOrSlug }],
+        where,
         relations: ['reviews', 'reviews.user', 'variants'],
       });
+
       if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
-
-      const ratingResult = await this.reviewRepo
-        .createQueryBuilder('r')
-        .select('AVG(r.rating)', 'avgRating')
-        .addSelect('COUNT(r.id)', 'reviewCount')
-        .where('r.productId = :id', { id: product.id })
-        .getRawOne();
-
-      const avgRating = ratingResult?.avgRating
-        ? parseFloat(parseFloat(ratingResult.avgRating).toFixed(1))
-        : null;
-      const reviewCount = ratingResult?.reviewCount
-        ? parseInt(String(ratingResult.reviewCount))
-        : 0;
-
-      // Return plain object to avoid TypeORM entity proxy issues
-      const data = {
-        id: product.id,
-        name: product.name,
-        slug: product.slug,
-        description: product.description,
-        price: Number(product.price),
-        originalPrice: product.originalPrice != null ? Number(product.originalPrice) : null,
-        images: product.images,
-        stock: product.stock,
-        sold: product.sold,
-        isActive: product.isActive,
-        specs: product.specs,
-        tagline: product.tagline,
-        featuredImage: product.featuredImage,
-        whatsInTheBox: product.whatsInTheBox,
-        extraMetadata: product.extraMetadata,
-        category: product.category,
-        variants: product.variants,
-        averageRating: avgRating,
-        reviewCount,
-        createdAt: product.createdAt,
-      };
-
-      return { data, success: true };
+      return { data: this.formatProduct(product), success: true };
     } catch (err) {
+      if (err instanceof NotFoundException) throw err;
       console.error('[findOne] error:', err);
       throw err;
     }
+  }
+
+  private formatProduct(product: any) {
+    return {
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      description: product.description,
+      price: Number(product.price),
+      originalPrice: product.originalPrice != null ? Number(product.originalPrice) : null,
+      images: product.images,
+      stock: product.stock,
+      sold: product.sold,
+      isActive: product.isActive,
+      specs: product.specs,
+      tagline: product.tagline,
+      featuredImage: product.featuredImage,
+      whatsInTheBox: product.whatsInTheBox,
+      extraMetadata: product.extraMetadata,
+      category: product.category,
+      variants: product.variants,
+      createdAt: product.createdAt,
+    };
   }
 
   async create(dto: CreateProductDto) {
@@ -158,14 +219,18 @@ export class ProductsService {
   async findAllAdmin(page = 1, limit = 20) {
     const [data, total] = await this.repo.findAndCount({
       relations: ['category'],
-      skip: (page - 1) * limit, take: limit,
+      skip: (page - 1) * limit,
+      take: limit,
       order: { createdAt: 'DESC' },
     });
     return { data, total, page, limit };
   }
 
   // ─── Variant CRUD ────────────────────────────────────────────────────────
-  async createVariant(productId: string, dto: { name: string; value: string; priceModifier?: number; stock?: number }) {
+  async createVariant(
+    productId: string,
+    dto: { name: string; value: string; priceModifier?: number; stock?: number },
+  ) {
     const product = await this.repo.findOne({ where: { id: productId } });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
     const variant = this.variantRepo.create({ ...dto, product });
@@ -173,7 +238,16 @@ export class ProductsService {
     return { data, success: true };
   }
 
-  async updateVariant(variantId: string, dto: { name?: string; value?: string; priceModifier?: number; stock?: number; isActive?: boolean }) {
+  async updateVariant(
+    variantId: string,
+    dto: {
+      name?: string;
+      value?: string;
+      priceModifier?: number;
+      stock?: number;
+      isActive?: boolean;
+    },
+  ) {
     const variant = await this.variantRepo.findOne({ where: { id: variantId } });
     if (!variant) throw new NotFoundException('Biến thể không tồn tại');
     Object.assign(variant, dto);

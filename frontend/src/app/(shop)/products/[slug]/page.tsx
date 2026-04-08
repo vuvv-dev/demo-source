@@ -1,11 +1,14 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
-import { Star, ShoppingCart, Minus, Plus, ChevronRight, Shield, Truck, Tag, Heart } from 'lucide-react';
-import { productsApi, reviewsApi, cartApi } from '@/lib/api';
-import { Product, Review, ProductVariant } from '@/types';
+import Image from 'next/image';
+import {
+  ChevronRight, Truck, Shield, Heart, Star, MessageCircle,
+  ChevronDown, Package,
+} from 'lucide-react';
+import { productsApi, cartApi, reviewsApi } from '@/lib/api';
+import { Product, ProductVariant, Review } from '@/types';
 import { formatPrice, cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import { useWishlistStore } from '@/store/wishlistStore';
@@ -14,391 +17,639 @@ import { useCartStore } from '@/store/cartStore';
 export default function ProductDetailPage() {
   const params = useParams();
   const [product, setProduct] = useState<Product | null>(null);
+  const [related, setRelated] = useState<Product[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
-  const [qty, setQty] = useState(1);
-  const [selectedImg, setSelectedImg] = useState(0);
-  const [activeTab, setActiveTab] = useState<'desc' | 'specs' | 'reviews'>('desc');
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+  const [openAccordions, setOpenAccordions] = useState<Record<string, boolean>>({ overview: true });
+  const [selectedImage, setSelectedImage] = useState(0);
+
   const { setItems } = useCartStore();
   const { toggle: toggleWishlist, ids: wishlistIds } = useWishlistStore();
 
   useEffect(() => {
     const slug = params.slug as string;
-    productsApi.detail(slug).then(r => {
-      setProduct(r.data.data);
+    setLoading(true);
+    productsApi.detail(slug).then(async r => {
+      const p = r.data.data;
+      setProduct(p);
+
+      // Auto-select first option of each variant group
       const vMap: Record<string, string> = {};
-      (r.data.data.variants || []).forEach((v: ProductVariant) => {
+      (p.variants || []).forEach((v: ProductVariant) => {
         if (!vMap[v.name]) vMap[v.name] = v.value;
       });
       setSelectedVariants(vMap);
       setLoading(false);
+
+      // Fetch related
+      if (p.category?.slug) {
+        productsApi.list({ categorySlug: p.category.slug, limit: 8 }).then(res => {
+          setRelated(res.data.data.filter((i: Product) => i.id !== p.id).slice(0, 6));
+        });
+      }
+
+      // Fetch reviews
+      try {
+        const revRes = await reviewsApi.list(p.id, { limit: 5 });
+        setReviews(revRes.data.data || []);
+      } catch { /* no reviews */ }
     }).catch(() => setLoading(false));
-    reviewsApi.list(slug).then(r => setReviews(r.data.data));
   }, [params.slug]);
 
-  const variantGroups = (product?.variants || []).reduce<Record<string, ProductVariant[]>>((acc, v) => {
-    if (!acc[v.name]) acc[v.name] = [];
-    acc[v.name].push(v);
-    return acc;
-  }, {});
+  // Compute selected variant object
+  const currentVariant = useMemo(() => {
+    if (!product?.variants?.length) return null;
+    const variants = product.variants;
+    return variants.find(v =>
+      Object.entries(selectedVariants).every(([name, val]) =>
+        variants.some(v2 => v2.name === name && v2.value === val && v2.id === v.id)
+      )
+    ) || null;
+  }, [product, selectedVariants]);
 
-  const getSelectedVariantStock = () => {
-    if (!product?.variants?.length) return product?.stock ?? 0;
-    const variant = product.variants.find(v =>
-      Object.entries(selectedVariants).every(([k, val]) => v.name === k && v.value === val)
-    );
-    return variant?.stock ?? product?.stock ?? 0;
-  };
-
-  const getDisplayPrice = () => {
+  // Dynamic price
+  const displayPrice = useMemo(() => {
     if (!product) return 0;
-    const variant = product.variants?.find(v =>
-      Object.entries(selectedVariants).every(([k, val]) => v.name === k && v.value === val)
-    );
-    return (product.price as number) + (variant?.priceModifier ?? 0);
-  };
+    let base = Number(product.price);
+    Object.entries(selectedVariants).forEach(([name, val]) => {
+      const v = (product.variants || []).find(vn => vn.name === name && vn.value === val);
+      if (v) base += Number(v.priceModifier);
+    });
+    return base;
+  }, [product, selectedVariants]);
+
+  // Dynamic stock
+  const displayStock = useMemo(() => {
+    if (currentVariant) return currentVariant.stock;
+    return product?.stock ?? 0;
+  }, [currentVariant, product]);
 
   const handleAddToCart = async () => {
     if (!product) return;
-    const hasVariants = (product.variants?.length ?? 0) > 0;
-    if (hasVariants && Object.keys(selectedVariants).length !== Object.keys(variantGroups).length) {
-      toast.error('Vui lòng chọn đầy đủ biến thể sản phẩm');
-      return;
-    }
     try {
       const res = await cartApi.addItem({
         productId: product.id,
-        quantity: qty,
-        selectedVariant: hasVariants ? selectedVariants : undefined,
+        quantity: 1,
+        selectedVariant: selectedVariants,
       });
       setItems(res.data.data.items || []);
-      toast.success('Đã thêm vào giỏ hàng!', { style: { borderRadius: '12px' } });
+      toast.success('Đã thêm vào giỏ hàng');
     } catch {
-      toast.error('Vui lòng đăng nhập để thêm vào giỏ');
+      toast.error('Vui lòng đăng nhập');
     }
   };
 
+  const toggleAccordion = (key: string) => {
+    setOpenAccordions(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // Group variants by name
+  const variantGroups = useMemo(() => {
+    if (!product?.variants?.length) return [];
+    const groups: Record<string, { value: string; stock: number; colorHex?: string }[]> = {};
+    product.variants.forEach(v => {
+      if (!groups[v.name]) groups[v.name] = [];
+      if (!groups[v.name].find(g => g.value === v.value)) {
+        groups[v.name].push({ value: v.value, stock: v.stock });
+      }
+    });
+    return Object.entries(groups);
+  }, [product]);
+
+  // Color map for swatches
+  const colorHex: Record<string, string> = {
+    'Trắng': '#FFFFFF', 'Đen': '#1d1d1f', 'Xám': '#86868b', 'Vàng': '#f5c518',
+    'Hồng': '#fbc2c4', 'Hồng Đào': '#ffb7a1', 'Đỏ': '#e53935', 'Xanh': '#4caf50',
+    'Xanh Mướp': '#a3c585', 'Xanh Băng': '#a7c7e7', 'Tím': '#9c7fc4',
+    'Ổ Đào': '#ff8c69', 'Ổ Đào Đậm': '#e07055', 'Phấn Hồng': '#f8c8dc',
+    'Đen Midnight': '#1d1d1f', 'Ánh Sao': '#faf9f6', 'Titan Tự Nhiên': '#b0a99a',
+    'Titan Sa Mạc': '#c4a882', 'Titan Trắng': '#e8e4de', 'Titan Đen': '#3a3a3c',
+    'Đen Slate': '#2c2c2e', 'Midnight': '#1a1a2e', 'Starlight': '#f0ece3',
+    'Blue': '#0071e3', 'Purple': '#af52de', 'Green': '#34c759', 'Yellow': '#ffd60a',
+  };
+
   if (loading) return (
-    <div className="bg-white min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          <div className="aspect-square rounded-2xl animate-pulse bg-[#f5f5f7]" />
-          <div className="space-y-4">
-            <div className="h-6 w-32 rounded-xl animate-pulse bg-[#f5f5f7]" />
-            <div className="h-10 w-3/4 rounded-xl animate-pulse bg-[#f5f5f7]" />
-            <div className="h-5 w-48 rounded-xl animate-pulse bg-[#f5f5f7]" />
-          </div>
-        </div>
+    <div className="bg-white min-h-screen flex items-center justify-center">
+      <div className="flex gap-2">
+        {[0, 1, 2].map(i => (
+          <div key={i} className="w-3 h-3 rounded-full bg-[#0071e3] animate-bounce-dot" style={{ animationDelay: `${i * 0.15}s` }} />
+        ))}
       </div>
     </div>
   );
 
   if (!product) return (
-    <div className="text-center py-24">
-      <p className="text-[#86868b]">Sản phẩm không tồn tại</p>
+    <div className="text-center py-32">
+      <h2 className="text-2xl font-semibold text-[#1d1d1f]">Không tìm thấy sản phẩm.</h2>
+      <Link href="/products" className="text-[#0071e3] hover:underline mt-4 inline-block">Quay lại cửa hàng</Link>
     </div>
   );
 
-  const displayPrice = getDisplayPrice();
-  const availableStock = getSelectedVariantStock();
-  const discount = product.originalPrice ? Math.round((1 - displayPrice / product.originalPrice) * 100) : 0;
-  const rating = product.averageRating ? Number(product.averageRating) : 0;
-  const ratingDist = [5, 4, 3, 2, 1].map(stars => {
-    const count = reviews.filter(r => r.rating === stars).length;
-    return { stars, count, pct: reviews.length ? Math.round(count / reviews.length * 100) : 0 };
-  });
-
   return (
-    <div className="bg-white min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs mb-8 text-[#86868b]">
-          <Link href="/" className="hover:text-[#1d1d1f] transition-colors">Trang chủ</Link>
-          <ChevronRight size={12} />
-          <Link href="/products" className="hover:text-[#1d1d1f] transition-colors">{product.category?.name}</Link>
-          <ChevronRight size={12} />
-          <span className="font-medium text-[#1d1d1f]">{product.name}</span>
+    <main className="bg-white min-h-screen">
+      {/* ── Sticky Nav ── */}
+      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-black/5">
+        <div className="max-w-7xl mx-auto px-6 h-12 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-[12px] text-[#1d1d1f]/70">
+            <Link href="/" className="font-medium hover:text-[#1d1d1f] transition-colors">Cửa hàng</Link>
+            <ChevronRight size={10} className="opacity-40" />
+            <Link href="/products" className="hover:text-[#1d1d1f] transition-colors">Sản phẩm</Link>
+            <ChevronRight size={10} className="opacity-40" />
+            {product.category && (
+              <>
+                <Link href={`/products?categorySlug=${product.category.slug}`} className="hover:text-[#1d1d1f] transition-colors">
+                  {product.category.name}
+                </Link>
+                <ChevronRight size={10} className="opacity-40" />
+              </>
+            )}
+            <span className="font-medium text-[#1d1d1f] line-clamp-1 max-w-[200px]">{product.name}</span>
+          </div>
+          <button
+            onClick={handleAddToCart}
+            className="h-8 px-4 rounded-full bg-[#0071e3] text-white text-[12px] font-semibold hover:bg-[#0077ed] transition-all active:scale-95"
+          >
+            Mua
+          </button>
         </div>
+      </nav>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Images */}
+      <div className="max-w-[1760px] mx-auto px-6 lg:px-10 py-10">
+        {/* ── Hero: Left=Image, Right=Info ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-start">
+
+          {/* ── LEFT: Gallery ── */}
           <div>
-            <div className="relative rounded-2xl overflow-hidden mb-4 aspect-square bg-[#f5f5f7]">
-              <Image
-                src={product.images[selectedImg] || 'https://via.placeholder.com/600'}
-                alt={product.name}
-                fill
-                className="object-contain"
-              />
-              {discount > 0 && (
-                <div className="absolute top-4 left-4 px-3 py-1.5 rounded-xl bg-[#ff3b30] text-white text-xs font-bold flex items-center gap-1">
-                  <Tag size={11} /> -{discount}%
+            {/* Main image */}
+            <div className="relative aspect-square bg-[#f5f5f7] rounded-[28px] overflow-hidden mb-4">
+              {product.images[selectedImage] ? (
+                <Image
+                  src={product.images[selectedImage]}
+                  alt={product.name}
+                  fill
+                  className="object-contain p-8 lg:p-12 transition-all duration-300"
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-[#86868b]">Không có hình</div>
+              )}
+              {/* Sale badge */}
+              {product.originalPrice && (
+                <div className="absolute top-5 left-5 px-3 py-1 rounded-full bg-[#bf4800] text-white text-[11px] font-semibold">
+                  Giảm {Math.round((1 - product.price / product.originalPrice) * 100)}%
+                </div>
+              )}
+              {/* New badge */}
+              {!product.originalPrice && (
+                <div className="absolute top-5 left-5 px-3 py-1 rounded-full bg-[#1d1d1f] text-white text-[11px] font-semibold">
+                  Mới
                 </div>
               )}
             </div>
+
+            {/* Thumbnails */}
             {product.images.length > 1 && (
-              <div className="flex gap-3">
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 {product.images.map((img, i) => (
                   <button
                     key={i}
-                    onClick={() => setSelectedImg(i)}
-                    className={`rounded-xl overflow-hidden border-2 transition-all ${selectedImg === i ? 'border-[#0071e3]' : 'border-transparent'}`}
-                    style={{ width: 72, height: 72 }}
+                    onClick={() => setSelectedImage(i)}
+                    className={cn(
+                      "shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all bg-white",
+                      selectedImage === i ? "border-[#0071e3]" : "border-transparent hover:border-gray-200"
+                    )}
                   >
-                    <Image src={img} alt="" width={72} height={72} className="object-cover w-full h-full" />
+                    <Image src={img} alt={`Ảnh ${i + 1}`} width={64} height={64} className="object-contain" />
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Info */}
-          <div>
-            <span className="text-xs font-medium px-3 py-1 rounded-full bg-[#f5f5f7] text-[#86868b]">
-              {product.category?.name}
-            </span>
-            <h1 className="text-2xl lg:text-3xl font-bold mt-3 leading-tight text-[#1d1d1f] tracking-tight">
-              {product.name}
-            </h1>
-
-            {/* Rating */}
-            <div className="flex items-center gap-3 mt-3">
-              <div className="flex gap-0.5">
-                {[1, 2, 3, 4, 5].map(i => (
-                  <Star key={i} size={16}
-                    className={i <= rating ? 'fill-[#f5c518] text-[#f5c518]' : 'fill-[#e5e5e7] text-[#e5e5e7]'} />
-                ))}
+          {/* ── RIGHT: Product Info ── */}
+          <div className="flex flex-col">
+            {/* Product title */}
+            <div className="mb-6">
+              <p className="text-[13px] font-medium text-[#bf4800] uppercase tracking-wide mb-1">Mới</p>
+              <h1 className="text-3xl lg:text-[40px] font-semibold text-[#1d1d1f] leading-[1.1] tracking-tight">
+                {product.name}
+              </h1>
+              <div className="flex items-baseline gap-3 mt-3">
+                <span className="text-2xl font-semibold text-[#1d1d1f]">{formatPrice(displayPrice)}</span>
+                {product.originalPrice && (
+                  <span className="text-base text-[#86868b] line-through">{formatPrice(product.originalPrice)}</span>
+                )}
               </div>
-              <span className="text-sm text-[#86868b]">
-                {rating}/5 · {product.reviewCount} đánh giá · {product.sold} đã bán
-              </span>
-            </div>
-
-            {/* Price */}
-            <div className="mt-6">
-              <p className="text-3xl font-bold text-[#1d1d1f]">{formatPrice(displayPrice)}</p>
-              {product.originalPrice && (
-                <div className="flex items-center gap-3 mt-1">
-                  <p className="text-base line-through text-[#86868b]">{formatPrice(product.originalPrice)}</p>
-                  <span className="text-sm font-bold text-white px-2 py-0.5 rounded-md bg-[#ff3b30]">−{discount}%</span>
+              {product.averageRating != null && (
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="flex gap-0.5">
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <Star key={i} size={13} style={{
+                        fill: i <= Math.round(Number(product.averageRating)) ? '#f5c518' : '#e5e5e7',
+                        color: i <= Math.round(Number(product.averageRating)) ? '#f5c518' : '#e5e5e7',
+                      }} />
+                    ))}
+                  </div>
+                  <span className="text-[13px] text-[#86868b]">{Number(product.averageRating).toFixed(1)} ({product.reviewCount} đánh giá)</span>
                 </div>
               )}
             </div>
 
-            {/* Stock status */}
-            <div className="flex items-center gap-2 mt-4">
-              <div className={`w-2 h-2 rounded-full ${availableStock > 0 ? 'bg-[#34c759]' : 'bg-[#ff3b30]'}`} />
-              <span className={`text-sm ${availableStock > 0 ? 'text-[#34c759]' : 'text-[#ff3b30]'}`}>
-                {availableStock > 0 ? (availableStock <= 5 ? `Chỉ còn ${availableStock} sản phẩm` : 'Còn hàng') : 'Hết hàng'}
-              </span>
-            </div>
-
-            {/* Variant selectors */}
-            {Object.entries(variantGroups).length > 0 && (
-              <div className="mt-6 space-y-4">
-                {Object.entries(variantGroups).map(([name, variants]) => (
-                  <div key={name}>
-                    <p className="text-sm font-medium mb-2 text-[#1d1d1f]">{name}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {variants.map(v => {
-                        const isSelected = selectedVariants[name] === v.value;
-                        const isOutOfStock = v.stock <= 0;
-                        return (
-                          <button
-                            key={v.id}
-                            onClick={() => !isOutOfStock && setSelectedVariants(s => ({ ...s, [name]: v.value }))}
-                            disabled={isOutOfStock}
-                            className={cn(
-                              'px-4 py-2 rounded-xl text-sm font-medium border transition-all',
-                              isSelected
-                                ? 'border-[#0071e3] bg-[#0071e3] text-white'
-                                : isOutOfStock
-                                  ? 'border-gray-200 bg-gray-50 text-gray-300 line-through cursor-not-allowed'
-                                  : 'border-gray-200 text-[#1d1d1f] hover:border-[#0071e3] hover:bg-[#0071e3]/5',
-                            )}
+            {/* Variant Pickers */}
+            {variantGroups.length > 0 && (
+              <div className="space-y-6 mb-8">
+                {variantGroups.map(([name, options]) => {
+                  const isColor = name.toLowerCase().includes('màu') || name.toLowerCase().includes('color');
+                  const selected = selectedVariants[name];
+                  return (
+                    <div key={name}>
+                      <div className="flex items-baseline gap-2 mb-3">
+                        <span className="text-[13px] font-semibold text-[#1d1d1f] uppercase tracking-wider">{name}</span>
+                        {selected && (
+                          <span className="text-[13px] text-[#86868b] normal-case font-normal">— {selected}</span>
+                        )}
+                      </div>
+                      {isColor ? (
+                        <div className="flex flex-wrap gap-3">
+                          {options.map(opt => (
+                            <button
+                              key={opt.value}
+                              onClick={() => setSelectedVariants(prev => ({ ...prev, [name]: opt.value }))}
+                              title={opt.value}
+                              className={cn(
+                                "w-10 h-10 rounded-full p-0.5 border-2 transition-all duration-200",
+                                selected === opt.value
+                                  ? "border-[#0071e3] scale-110"
+                                  : "border-transparent hover:border-gray-300"
+                              )}
+                            >
+                              <div
+                                className="w-full h-full rounded-full border border-black/10"
+                                style={{ backgroundColor: colorHex[opt.value] || '#ccc' }}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <select
+                            value={selected || ''}
+                            onChange={e => setSelectedVariants(prev => ({ ...prev, [name]: e.target.value }))}
+                            className="w-full h-12 rounded-xl border border-black/10 bg-[#f5f5f7] px-4 text-[15px] font-medium text-[#1d1d1f] cursor-pointer appearance-none pr-10 focus:border-[#0071e3] focus:outline-none transition-colors"
                           >
-                            {v.value}{v.priceModifier !== 0 && ` (${v.priceModifier > 0 ? '+' : ''}${formatPrice(v.priceModifier)})`}
-                          </button>
-                        );
-                      })}
+                            {options.map(opt => (
+                              <option key={opt.value} value={opt.value}>{opt.value}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#86868b] pointer-events-none" />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
-            {/* Quantity */}
-            {availableStock > 0 && (
-              <div className="mt-6">
-                <p className="text-sm font-medium mb-3 text-[#1d1d1f]">Số lượng</p>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center border border-[#e5e5e7] rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => setQty(q => Math.max(1, q - 1))}
-                      className="w-10 h-10 flex items-center justify-center text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors"
-                    >
-                      <Minus size={14} />
-                    </button>
-                    <input
-                      type="number"
-                      value={qty}
-                      onChange={e => setQty(Math.max(1, Math.min(availableStock, parseInt(e.target.value) || 1)))}
-                      className="w-12 h-10 text-center text-sm font-medium bg-transparent text-[#1d1d1f] outline-none"
-                    />
-                    <button
-                      onClick={() => setQty(q => Math.min(product.stock, q + 1))}
-                      className="w-10 h-10 flex items-center justify-center text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors"
-                    >
-                      <Plus size={14} />
-                    </button>
-                  </div>
-                  <span className="text-sm text-[#86868b]">Còn {availableStock} sản phẩm</span>
+            {/* Delivery / Stock Info */}
+            <div className="bg-[#f5f5f7] rounded-2xl p-5 mb-6 space-y-3">
+              <div className="flex items-center gap-3">
+                <Truck size={18} className="text-[#86868b] shrink-0" />
+                <div>
+                  <p className="text-[13px] font-medium text-[#1d1d1f]">Giao hàng:</p>
+                  <p className="text-[13px] text-[#86868b]">
+                    {displayStock > 0 ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#34c759] inline-block" />
+                        Còn hàng
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#ff3b30] inline-block" />
+                        Hết hàng
+                      </span>
+                    )}
+                    {displayStock > 0 && displayStock <= 10 && (
+                      <span className="text-[#ff9f0a] ml-2 font-medium">— Chỉ còn {displayStock}</span>
+                    )}
+                  </p>
                 </div>
               </div>
-            )}
+              <div className="flex items-center gap-3">
+                <Package size={18} className="text-[#86868b] shrink-0" />
+                <div>
+                  <p className="text-[13px] text-[#86868b]">Vận chuyển miễn phí cho tất cả đơn hàng.</p>
+                </div>
+              </div>
+            </div>
 
             {/* CTA */}
-            <div className="flex gap-3 mt-8">
+            <button
+              onClick={handleAddToCart}
+              disabled={displayStock === 0}
+              className={cn(
+                "w-full h-14 rounded-2xl font-semibold text-[17px] transition-all active:scale-[0.98] mb-3",
+                displayStock > 0
+                  ? "bg-[#0071e3] text-white hover:bg-[#0077ed] shadow-lg shadow-blue-500/20"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              )}
+            >
+              {displayStock > 0 ? 'Thêm vào Giỏ Hàng' : 'Hết hàng'}
+            </button>
+
+            {/* Save for later */}
+            <div className="flex items-center justify-center gap-2 py-3">
               <button
-                onClick={handleAddToCart}
-                disabled={availableStock === 0}
-                className={`apple-btn-primary flex-1 group/btn disabled:opacity-50 disabled:cursor-not-allowed ${availableStock === 0 ? '' : ''}`}
+                onClick={() => toggleWishlist(product.id)}
+                className="flex items-center gap-2 text-[13px] text-[#0066cc] hover:underline"
               >
-                <ShoppingCart size={18} /> Thêm vào giỏ hàng
-              </button>
-              <button
-                onClick={() => window.location.href = '/checkout'}
-                className="flex-1 h-12 rounded-xl text-sm font-medium border border-[#e5e5e7] text-[#1d1d1f] bg-white hover:bg-[#f5f5f7] transition-all"
-              >
-                Mua ngay
-              </button>
-              <button
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  try {
-                    await toggleWishlist(product.id);
-                    toast.success(wishlistIds.has(product.id) ? 'Đã xóa khỏi yêu thích' : 'Đã thêm vào yêu thích!');
-                  } catch { toast.error('Vui lòng đăng nhập'); }
-                }}
-                className={`h-12 w-12 rounded-xl border flex items-center justify-center transition-all ${wishlistIds.has(product.id)
-                    ? 'border-[#ff3b30] text-[#ff3b30] bg-[#fff5f5]'
-                    : 'border-[#e5e5e7] text-[#86868b] bg-white hover:bg-[#fff5f5]'
-                  }`}
-                aria-label="Yêu thích"
-              >
-                <Heart size={18} className={wishlistIds.has(product.id) ? 'fill-[#ff3b30]' : ''} />
+                <Heart size={14} className={wishlistIds.has(product.id) ? 'fill-[#ff3b30] text-[#ff3b30]' : ''} />
+                {wishlistIds.has(product.id) ? 'Xóa khỏi Yêu thích' : 'Lưu để xem lại sau'}
               </button>
             </div>
 
-            {/* Trust badges */}
-            <div className="mt-6 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[#f5f5f7]">
-              {[
-                { icon: Shield, text: 'Bảo hành chính hãng 12 tháng' },
-                { icon: Truck, text: 'Giao hàng miễn phí nội thành' },
-              ].map(({ icon: Icon, text }) => (
-                <div key={text} className="flex items-center gap-2 text-sm text-[#1d1d1f]">
-                  <Icon size={14} className="text-[#34c759]" />
-                  <span>{text}</span>
-                </div>
-              ))}
+            {/* Divider */}
+            <div className="border-t border-black/5 my-6" />
+
+            {/* Support */}
+            <div className="space-y-2.5 text-[13px]">
+              <div className="flex items-start gap-2.5">
+                <MessageCircle size={15} className="text-[#86868b] mt-0.5 shrink-0" />
+                <p className="text-[#86868b]">
+                  <span className="font-semibold text-[#1d1d1f]">Trợ giúp mua sắm. </span>
+                  <button className="text-[#0066cc] hover:underline">Chat ngay</button>
+                  <span> hoặc gọi 1800-1192.</span>
+                </p>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <Shield size={15} className="text-[#86868b] mt-0.5 shrink-0" />
+                <p className="text-[#86868b]">
+                  Bảo hành chính hãng 12 tháng tại các trung tâm ủy quyền Apple.
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="mt-16">
-          <div className="flex gap-0 border-b border-[#f0f0f0]">
-            {(['desc', 'specs', 'reviews'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? 'border-[#0071e3] text-[#0071e3]' : 'border-transparent text-[#86868b]'
-                  }`}
-              >
-                {tab === 'desc' ? 'Mô tả' : tab === 'specs' ? 'Thông số kỹ thuật' : `Đánh giá (${reviews.length})`}
-              </button>
+        {/* ── Info Accordion ── */}
+        <div className="mt-16 max-w-3xl">
+          <AccordionSection product={product} openItems={openAccordions} toggle={toggleAccordion} />
+        </div>
+
+        {/* ── Reviews ── */}
+        <ReviewsSection reviews={reviews} product={product} />
+
+        {/* ── Related Products ── */}
+        {related.length > 0 && (
+          <RelatedProductsSection products={related} />
+        )}
+      </div>
+
+      {/* ── Legal ── */}
+      <div className="bg-[#f5f5f7] py-10 mt-8">
+        <div className="max-w-7xl mx-auto px-6 lg:px-10 text-[11px] text-[#86868b] leading-[1.7] space-y-1">
+          <p>Giá hiển thị đã bao gồm tất cả các khoản thuế (VAT). Giao hàng miễn phí cho tất cả đơn hàng.</p>
+          <p>Bản quyền © 2026 Apple Inc. Bảo lưu mọi quyền.</p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+// ── Accordion Section ────────────────────────────────────────────────────────
+function AccordionSection({
+  product,
+  openItems,
+  toggle,
+}: {
+  product: Product;
+  openItems: Record<string, boolean>;
+  toggle: (k: string) => void;
+}) {
+  return (
+    <div className="border-t border-black/5">
+      <SectionTitle title="Thông Tin Sản Phẩm" />
+
+      {/* Overview */}
+      <AccordionItem
+        title="Tổng Quan"
+        isOpen={!!openItems['overview']}
+        onToggle={() => toggle('overview')}
+      >
+        <div className="space-y-5 text-[#86868b] leading-relaxed">
+          {product.description.split('. ').filter(Boolean).map((p, i) => (
+            <p key={i}>{p}.</p>
+          ))}
+        </div>
+      </AccordionItem>
+
+      {/* Box */}
+      {product.whatsInTheBox && (
+        <AccordionItem
+          title="Trong hộp có gì"
+          isOpen={!!openItems['box']}
+          onToggle={() => toggle('box')}
+        >
+          <p className="text-[#86868b]">{product.whatsInTheBox}</p>
+        </AccordionItem>
+      )}
+
+      {/* Specs */}
+      {product.specs && Object.keys(product.specs).length > 0 && (
+        <AccordionItem
+          title="Thông số kỹ thuật"
+          isOpen={!!openItems['specs']}
+          onToggle={() => toggle('specs')}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-5">
+            {Object.entries(product.specs).map(([key, val]) => (
+              <div key={key} className="flex flex-col gap-1 border-l-2 border-[#f5f5f7] pl-4">
+                <span className="text-[11px] font-bold text-[#86868b] uppercase tracking-wider">{key}</span>
+                <span className="text-[15px] text-[#1d1d1f] font-medium">{val}</span>
+              </div>
             ))}
           </div>
+        </AccordionItem>
+      )}
+    </div>
+  );
+}
 
-          <div className="py-8">
-            {activeTab === 'desc' && (
-              <p className="text-base leading-relaxed max-w-3xl text-[#86868b]" style={{ whiteSpace: 'pre-line' }}>
-                {product.description}
-              </p>
-            )}
+// ── Reviews Section ───────────────────────────────────────────────────────────
+function ReviewsSection({ reviews, product }: { reviews: Review[]; product: Product }) {
+  const [showAll, setShowAll] = useState(false);
 
-            {activeTab === 'specs' && (
-              <div className="max-w-xl">
-                <table className="w-full">
-                  <tbody>
-                    {Object.entries(product.specs || {}).map(([key, val], i) => (
-                      <tr key={key} className={i % 2 === 0 ? 'bg-white' : 'bg-[#f9f9fb]'}>
-                        <td className="py-3 px-4 text-sm font-medium w-44 text-[#86868b]">{key}</td>
-                        <td className="py-3 px-4 text-sm font-medium text-[#1d1d1f]">{val}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+  return (
+    <section className="mt-16 pt-16 border-t border-black/5">
+      <SectionTitle title="Đánh Giá" />
 
-            {activeTab === 'reviews' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Rating summary */}
-                <div className="p-6 rounded-2xl bg-[#f5f5f7]">
-                  <div className="text-center mb-6">
-                    <p className="text-5xl font-bold text-[#1d1d1f]">{rating}</p>
-                    <div className="flex justify-center mt-2 gap-0.5">
-                      {[1, 2, 3, 4, 5].map(i => <Star key={i} size={18} className={i <= rating ? 'fill-[#f5c518] text-[#f5c518]' : 'fill-[#e5e5e7] text-[#e5e5e7]'} />)}
-                    </div>
-                    <p className="text-sm mt-1 text-[#86868b]">{reviews.length} đánh giá</p>
-                  </div>
-                  <div className="space-y-2">
-                    {ratingDist.map(({ stars, count, pct }) => (
-                      <div key={stars} className="flex items-center gap-3">
-                        <span className="text-xs w-8 text-[#86868b]">{stars} ★</span>
-                        <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-[#e5e5e7]">
-                          <div className="h-full rounded-full bg-[#f5c518] transition-all" style={{ width: `${pct}%` }} />
-                        </div>
-                        <span className="text-xs w-4 text-right text-[#86868b]">{count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Review list */}
-                <div className="space-y-4">
-                  {reviews.length === 0 && (
-                    <p className="text-base text-center py-12 text-[#86868b]">Chưa có đánh giá nào. Hãy là người đầu tiên!</p>
-                  )}
-                  {reviews.map(review => (
-                    <div key={review.id} className="p-4 rounded-2xl border border-[#f0f0f0]">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-[#0071e3] flex items-center justify-center text-white text-xs font-bold">
-                            {review.user?.name?.[0]?.toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-[#1d1d1f]">{review.user?.name}</p>
-                            <div className="flex gap-0.5">
-                              {[1, 2, 3, 4, 5].map(i => <Star key={i} size={10} className={i <= review.rating ? 'fill-[#f5c518] text-[#f5c518]' : 'fill-[#e5e5e7] text-[#e5e5e7]'} />)}
-                            </div>
-                          </div>
-                        </div>
-                        <span className="text-xs text-[#86868b]">
-                          {new Date(review.createdAt).toLocaleDateString('vi-VN')}
-                        </span>
-                      </div>
-                      <p className="text-sm leading-relaxed text-[#86868b]">{review.comment}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+      {/* Rating summary */}
+      {product.averageRating != null && (
+        <div className="flex items-start gap-8 mb-10">
+          <div className="text-center">
+            <div className="text-6xl font-semibold text-[#1d1d1f] leading-none">
+              {Number(product.averageRating).toFixed(1)}
+            </div>
+            <div className="flex gap-0.5 mt-2 justify-center">
+              {[1, 2, 3, 4, 5].map(i => (
+                <Star key={i} size={16} style={{
+                  fill: i <= Math.round(Number(product.averageRating)) ? '#f5c518' : '#e5e5e7',
+                  color: i <= Math.round(Number(product.averageRating)) ? '#f5c518' : '#e5e5e7',
+                }} />
+              ))}
+            </div>
+            <p className="text-[13px] text-[#86868b] mt-1">{product.reviewCount} đánh giá</p>
           </div>
         </div>
+      )}
+
+      {/* Review list */}
+      {reviews.length === 0 ? (
+        <p className="text-[15px] text-[#86868b]">Chưa có đánh giá nào. Hãy là người đầu tiên!</p>
+      ) : (
+        <div className="space-y-6">
+          {(showAll ? reviews : reviews.slice(0, 3)).map(rev => (
+            <div key={rev.id} className="border-b border-black/5 pb-6 last:border-0">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 rounded-full bg-[#f5f5f7] flex items-center justify-center text-[13px] font-semibold text-[#86868b]">
+                  {rev.user?.name?.charAt(0)?.toUpperCase() || 'A'}
+                </div>
+                <div>
+                  <p className="text-[13px] font-semibold text-[#1d1d1f]">{rev.user?.name || 'Ẩn danh'}</p>
+                  <div className="flex gap-0.5">
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <Star key={i} size={11} style={{
+                        fill: i <= rev.rating ? '#f5c518' : '#e5e5e7',
+                        color: i <= rev.rating ? '#f5c518' : '#e5e5e7',
+                      }} />
+                    ))}
+                  </div>
+                </div>
+                <span className="ml-auto text-[12px] text-[#86868b]">
+                  {new Date(rev.createdAt).toLocaleDateString('vi-VN')}
+                </span>
+              </div>
+              <p className="text-[15px] text-[#1d1d1f] leading-relaxed">{rev.comment}</p>
+            </div>
+          ))}
+          {reviews.length > 3 && (
+            <button
+              onClick={() => setShowAll(v => !v)}
+              className="text-[13px] text-[#0066cc] hover:underline font-medium"
+            >
+              {showAll ? 'Thu gọn' : `Xem tất cả ${reviews.length} đánh giá`} →
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ── Related Products ─────────────────────────────────────────────────────────
+function RelatedProductsSection({ products }: { products: Product[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (dir: 'left' | 'right') => {
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollBy({ left: dir === 'right' ? 280 : -280, behavior: 'smooth' });
+  };
+
+  return (
+    <section className="mt-20 pt-16 border-t border-black/5">
+      <div className="flex items-center justify-between mb-10">
+        <h2 className="text-3xl font-semibold text-[#1d1d1f] tracking-tight">
+          Có thể bạn cũng sẽ thích
+        </h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => scroll('left')}
+            className="w-10 h-10 rounded-full border border-black/10 flex items-center justify-center hover:bg-[#f5f5f7] transition-colors"
+          >
+            <ChevronRight size={18} className="rotate-180" />
+          </button>
+          <button
+            onClick={() => scroll('right')}
+            className="w-10 h-10 rounded-full border border-black/10 flex items-center justify-center hover:bg-[#f5f5f7] transition-colors"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      </div>
+
+      <div
+        ref={scrollRef}
+        className="flex gap-5 overflow-x-auto pb-4 scrollbar-hide scroll-smooth"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {products.map(p => (
+          <div key={p.id} className="shrink-0 w-[240px] lg:w-[260px]">
+            <Link href={`/products/${p.slug}`} className="group block">
+              <div className="relative aspect-square bg-[#f5f5f7] rounded-2xl overflow-hidden mb-3">
+                <Image
+                  src={p.images[0] || 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=300'}
+                  alt={p.name}
+                  fill
+                  className="object-contain p-4 group-hover:scale-105 transition-transform duration-300"
+                  sizes="260px"
+                />
+                {p.averageRating != null && (
+                  <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-full px-2 py-0.5">
+                    <Star size={10} className="text-[#f5c518]" fill="#f5c518" />
+                    <span className="text-[10px] font-semibold text-[#1d1d1f]">{Number(p.averageRating).toFixed(1)}</span>
+                  </div>
+                )}
+              </div>
+              <h3 className="text-[14px] font-medium text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors line-clamp-2 leading-snug">
+                {p.name}
+              </h3>
+              <p className="text-[14px] font-semibold text-[#1d1d1f] mt-1">{formatPrice(p.price as number)}</p>
+            </Link>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ── Shared Components ─────────────────────────────────────────────────────────
+function SectionTitle({ title }: { title: string }) {
+  return <h2 className="text-2xl lg:text-3xl font-semibold text-[#1d1d1f] tracking-tight mb-8">{title}</h2>;
+}
+
+function AccordionItem({
+  title,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-b border-black/5 last:border-0">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between py-6 text-left hover:text-[#0071e3] transition-colors group"
+      >
+        <span className="text-[17px] lg:text-xl font-semibold text-[#1d1d1f] group-hover:text-[#0071e3] transition-colors">
+          {title}
+        </span>
+        <div className={cn(
+          "w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 shrink-0",
+          isOpen ? "bg-[#1d1d1f] text-white rotate-180" : "bg-[#f5f5f7] text-[#86868b]"
+        )}>
+          <ChevronDown size={15} />
+        </div>
+      </button>
+      <div className={cn(
+        "overflow-hidden transition-all duration-500 ease-in-out",
+        isOpen ? "max-h-[2000px] pb-8 opacity-100" : "max-h-0 opacity-0"
+      )}>
+        {children}
       </div>
     </div>
   );

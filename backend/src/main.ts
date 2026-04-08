@@ -7,7 +7,10 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.enableCors({ origin: 'http://localhost:3000', credentials: true });
+  const port = process.env.PORT || 3001;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+  app.enableCors({ origin: frontendUrl, credentials: true });
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
@@ -20,8 +23,8 @@ async function bootstrap() {
     .build();
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
 
-  await app.listen(3001);
-  console.log('🚀 Backend running at http://localhost:3001');
-  console.log('📚 Swagger docs at http://localhost:3001/api/docs');
+  await app.listen(port);
+  console.log(`🚀 Backend running at http://localhost:${port}`);
+  console.log(`📚 Swagger docs at http://localhost:${port}/api/docs`);
 }
 bootstrap();

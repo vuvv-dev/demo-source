@@ -23,6 +23,10 @@ export interface Product {
   category: Category; averageRating?: string | null;
   reviewCount?: number; createdAt: string;
   variants?: ProductVariant[];
+  tagline?: string;
+  featuredImage?: string;
+  whatsInTheBox?: string;
+  extraMetadata?: Record<string, any>;
 }
 
 export interface CartItem {
