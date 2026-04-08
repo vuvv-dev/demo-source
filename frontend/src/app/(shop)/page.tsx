@@ -136,15 +136,19 @@ export default function HomePage() {
       {/* Hero */}
       <section className="pt-10 lg:pt-16 pb-10">
         <div className="max-w-[1300px] mx-auto px-6">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-14 animate-fade-in">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 mb-14 animate-fade-in">
             <h1 className="text-6xl lg:text-[72px] font-semibold text-[#1d1d1f] tracking-tight leading-none">
               Cửa Hàng
             </h1>
-            <div className="flex flex-col gap-5 shrink-0 lg:text-right lg:pb-3">
+            <div className="flex flex-col shrink-0 lg:text-right lg:pb-3">
               <p className="text-[15px] lg:text-base text-[#1d1d1f] font-medium leading-relaxed">
-                Cách tốt nhất để mua<br />sản phẩm bạn thích.
+                Cách tốt nhất để mua sản phẩm bạn thích.
               </p>
               <div className="flex items-center lg:justify-end gap-3 mt-2">
+                <Link href="#" className="text-[#0066cc] hover:underline text-[13px] lg:text-sm font-medium inline-flex items-center gap-1">
+                  Kết Nối Với Chuyên Gia
+                  <ArrowRight size={14} />
+                </Link>
                 <div className="flex -space-x-2">
                   {[10, 11, 12].map((i) => (
                     <div key={i} className="w-9 h-9 rounded-full border-2 border-white overflow-hidden bg-gray-100 ring-2 ring-gray-50">
@@ -152,10 +156,7 @@ export default function HomePage() {
                     </div>
                   ))}
                 </div>
-                <Link href="#" className="text-[#0066cc] hover:underline text-[13px] lg:text-sm font-medium inline-flex items-center gap-1">
-                  Hỏi Chuyên Gia
-                  <ArrowRight size={14} />
-                </Link>
+
               </div>
             </div>
           </div>
@@ -179,7 +180,7 @@ export default function HomePage() {
                   className="flex flex-col items-center group animate-slide-up"
                   style={{ animationDelay: `${i * 40}ms` }}
                 >
-                  <div className="relative w-20 h-20 mb-3 transition-all duration-300 group-hover:scale-110 rounded-full bg-[#fafafa] border border-gray-100/50 flex items-center justify-center overflow-hidden shadow-sm group-hover:shadow-md">
+                  <div className="relative w-20 h-20 mb-3 transition-all duration-300 group-hover:scale-110 rounded-full bg-[#F5F4F7] border border-gray-100/50 flex items-center justify-center overflow-hidden shadow-sm group-hover:shadow-md">
                     <div className="relative w-[70%] h-[70%]">
                       <Image
                         src={cat.image}
