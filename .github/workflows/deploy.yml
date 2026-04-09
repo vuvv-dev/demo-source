@@ -209,8 +209,8 @@ jobs:
             # ── 5. Deploy ──────────────────────────────────────────────────────
             export REGISTRY IMAGE_NAME SHA NGINX_PUBLIC_PORT FRONTEND_PORT BACKEND_PORT
             cd "$DEPLOY_DIR"
-            docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
-            docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker compose -f docker-compose.prod.yml down 2>/dev/null || true
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
             echo ""
             echo "==> Containers status:"
