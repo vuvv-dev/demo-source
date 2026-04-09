@@ -209,6 +209,12 @@ jobs:
             # ── 5. Deploy ──────────────────────────────────────────────────────
             export REGISTRY IMAGE_NAME SHA NGINX_PUBLIC_PORT FRONTEND_PORT BACKEND_PORT
             cd "$DEPLOY_DIR"
+
+            # Remove ALL containers with "apple-store" prefix to avoid conflicts
+            docker rm -f $(docker ps -aq --filter "name=apple-store" 2>/dev/null) 2>/dev/null || true
+            # Also remove any orphan nginx containers that may exist from previous failed runs
+            docker rm -f $(docker ps -aq --filter "ancestor=nginx:alpine" --filter "name=apple-store-nginx" 2>/dev/null) 2>/dev/null || true
+
             docker compose -f docker-compose.prod.yml down 2>/dev/null || true
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
