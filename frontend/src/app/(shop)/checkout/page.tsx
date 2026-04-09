@@ -2,18 +2,19 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { 
-  CreditCard, 
-  Truck, 
-  CheckCircle2, 
-  Lock, 
-  ChevronRight, 
-  MapPin, 
-  Plus, 
+import {
+  CreditCard,
+  Truck,
+  CheckCircle2,
+  Lock,
+  ChevronRight,
+  MapPin,
+  Plus,
   ShieldCheck,
   AlertCircle,
   ArrowRight,
-  ArrowLeft
+  ArrowLeft,
+  QrCode
 } from 'lucide-react';
 import { ordersApi, paymentsApi, addressesApi } from '@/lib/api';
 import { formatPrice } from '@/lib/utils';
@@ -21,6 +22,11 @@ import { useCartStore } from '@/store/cartStore';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
 import vnDataRaw from '@/data/vietnam-provinces.json';
+import VietQRModal from '@/components/shop/VietQRModal';
+
+function QrCodeIcon({ size = 18, className = '' }: { size?: number; className?: string }) {
+  return <QrCode size={size} className={className} />;
+}
 
 const vnData = ((vnDataRaw as any).default || vnDataRaw) as any[];
 
@@ -57,6 +63,8 @@ export default function CheckoutPage() {
 
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [note, setNote] = useState('');
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrOrderId, setQrOrderId] = useState<string | null>(null);
 
   // Calculate Shipping
   const subtotal = getTotal();
@@ -149,6 +157,14 @@ export default function CheckoutPage() {
 
       const res = await ordersApi.create(payload);
 
+      // bank_transfer: show QR modal after order is created
+      if (paymentMethod === 'bank_transfer') {
+        setQrOrderId(res.data.data.id);
+        setShowQRModal(true);
+        return;
+      }
+
+      // payos: redirect to PayOS checkout page
       if (paymentMethod === 'payos' && res.data.requiresPayment) {
         const sessionRes = await paymentsApi.createCheckoutSession(res.data.data.id);
         const checkoutUrl = sessionRes.data.data.checkoutUrl;
@@ -332,8 +348,8 @@ export default function CheckoutPage() {
                   <div className="grid gap-4">
                     {[
                       { id: 'cod', label: 'Thanh toán khi nhận hàng (COD)', icon: Truck, desc: 'Trả bằng tiền mặt khi shipper giao hàng đến.' },
-                      { id: 'bank_transfer', label: 'Chuyển khoản trực tiếp', icon: CreditCard, desc: 'Thông tin số tài khoản sẽ hiện sau khi đặt hàng.' },
-                      { id: 'payos', label: 'Thanh toán nhanh payOS', icon: Lock, desc: 'Chuyển khoản QR tự động (An toàn & nhanh chóng).' }
+                      { id: 'bank_transfer', label: 'Chuyển khoản QR Code', icon: QrCodeIcon, desc: 'Quét mã QR bằng app ngân hàng. Xác nhận tức thì.' },
+                      { id: 'payos', label: 'Thanh toán nhanh PayOS', icon: Lock, desc: 'Chuyển khoản qua cổng PayOS. An toàn & nhanh chóng.' }
                     ].map(method => (
                       <label key={method.id} className={`flex items-start gap-4 p-5 rounded-2xl border cursor-pointer transition-all ${
                         paymentMethod === method.id ? 'border-[#0071e3] bg-[#eff6ff]' : 'border-[#e5e5e7] hover:border-[#d2d2d7]'
@@ -391,7 +407,7 @@ export default function CheckoutPage() {
                         <MapPin size={18} />
                         <h4 className="font-bold">Địa chỉ giao hàng</h4>
                       </div>
-                      {(!user || showAddressForm) ? (
+                      {(!user || showAddressForm || !selectedAddressId) ? (
                         <div className="text-sm text-[#1d1d1f]">
                           <p className="font-semibold">{manualAddress.name}</p>
                           <p>{manualAddress.phone}</p>
@@ -428,7 +444,11 @@ export default function CheckoutPage() {
 
                   <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-100 flex gap-3 text-sm text-blue-700">
                     <ShieldCheck className="shrink-0" />
-                    <p>Bằng cách nhấn "Đặt hàng hàng ngay", bạn đồng ý với các điều khoản dịch vụ và chính sách bảo mật của Docimal.</p>
+                    {paymentMethod === 'bank_transfer' ? (
+                      <p>Đơn hàng sẽ được tạo và mã QR sẽ hiện ra ngay. Bạn có thể quét và thanh toán ngay.</p>
+                    ) : (
+                      <p>Bằng cách nhấn &ldquo;Đặt hàng hàng ngay&ldquo;, bạn đồng ý với các điều khoản dịch vụ và chính sách bảo mật của Docimal.</p>
+                    )}
                   </div>
                 </div>
 
@@ -517,6 +537,18 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {/* VietQR Modal */}
+      {showQRModal && qrOrderId && (
+        <VietQRModal
+          orderId={qrOrderId}
+          orderNumber=""
+          amount={total}
+          paymentMethod="bank_transfer"
+          onClose={() => { setShowQRModal(false); router.push('/orders'); }}
+          onConfirmed={() => { setShowQRModal(false); setItems([]); router.push('/orders'); }}
+        />
+      )}
     </div>
   );
 }

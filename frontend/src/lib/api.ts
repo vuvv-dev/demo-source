@@ -146,6 +146,8 @@ export const dashboardApi = {
 // ─── Payments ──────────────────────────────────────────────────────────────
 export const paymentsApi = {
   createCheckoutSession: (orderId: string) => api.post('/payments/create-checkout-session', { orderId }),
+  getQRCode: (orderId: string) => api.get(`/payments/qr/${orderId}`),
+  confirmPayment: (orderId: string) => api.patch(`/payments/confirm/${orderId}`),
 };
 
 // ─── Users ────────────────────────────────────────────────────────────────

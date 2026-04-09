@@ -57,7 +57,18 @@
       "Bash(taskkill //F //PID 1968)",
       "Bash(npx nest:*)",
       "Bash(taskkill //F //PID 25044)",
-      "Bash(xxd)"
+      "Bash(xxd)",
+      "Bash(npx skills:*)",
+      "Bash(npx playwright:*)",
+      "Bash(npm search:*)",
+      "Bash(npm view:*)",
+      "Bash(npm info:*)",
+      "Bash(grep -r \"BANK_\\\\|vietqr\" backend/.env*)",
+      "WebSearch",
+      "Bash(npm show:*)",
+      "WebFetch(domain:sepay.vn)",
+      "WebFetch(domain:docs.sepay.vn)",
+      "WebFetch(domain:qr.sepay.vn)"
     ]
   }
 }

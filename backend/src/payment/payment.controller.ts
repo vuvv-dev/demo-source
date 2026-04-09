@@ -1,6 +1,5 @@
-import { Controller, Post, Get, Body, Param, Headers, RawBodyRequest, Req, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Patch, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { Request } from 'express';
 import { PaymentService } from './payment.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -17,8 +16,24 @@ export class PaymentController {
     return this.service.createCheckoutSession(user.id, orderId);
   }
 
-  @Post('webhook')
-  handleWebhook(@Body() body: any) {
-    return this.service.handleWebhook(body);
+  @Get('qr/:orderId')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  getQRCode(@CurrentUser() user: any, @Param('orderId') orderId: string) {
+    return this.service.getQRCodeUrl(user.id, orderId);
+  }
+
+  @Patch('confirm/:orderId')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  confirmPayment(@CurrentUser() user: any, @Param('orderId') orderId: string) {
+    return this.service.confirmPayment(user.id, orderId);
+  }
+
+  /** PayOS webhook */
+  @Post('webhook/payos')
+  @HttpCode(HttpStatus.OK)
+  async webhookPayOS(@Body() body: any) {
+    return this.service.handlePayOSWebhook(body);
   }
 }

@@ -71,7 +71,7 @@ export default function OrdersPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="max-w-3xl mx-auto px-4 py-10">
+      <div className="max-w-[1000px] mx-auto px-4 py-10">
 
         {/* Header */}
         <div className="flex items-end justify-between mb-8">

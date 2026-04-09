@@ -102,7 +102,7 @@ export default function OrderDetailPage() {
   const canPay = order.status === 'pending' && order.paymentMethod === 'payos' && order.paymentStatus === 'pending';
 
   return (
-    <div className="bg-[#f5f5f7] min-h-screen">
+    <div className="min-h-screen">
       <div className="max-w-[1280px] mx-auto px-4 py-8">
 
         {/* Back + Header */}
@@ -124,9 +124,9 @@ export default function OrderDetailPage() {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-[1.6rem] font-bold text-[#1d1d1f] tracking-tight leading-none">
-                #{order.orderNumber}
+                {order.orderNumber}
               </h1>
-              <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full border ${st.bg} ${st.border} ${st.text}`}>
+              <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold pr-3 py-1 rounded-full border ${st.bg} ${st.border} ${st.text}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${st.iconColor.replace('text-', 'bg-')}`} />
                 {st.label}
               </span>
