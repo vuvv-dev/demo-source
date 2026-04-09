@@ -180,6 +180,7 @@ export class ProductsService {
       isActive: product.isActive,
       specs: product.specs,
       tagline: product.tagline,
+      shortDescription: product.shortDescription,
       featuredImage: product.featuredImage,
       whatsInTheBox: product.whatsInTheBox,
       extraMetadata: product.extraMetadata,

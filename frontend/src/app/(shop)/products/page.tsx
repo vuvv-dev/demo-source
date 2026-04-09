@@ -127,9 +127,29 @@ function ProductsContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, debouncedSearch, selectedCategory, sortBy, order, minPrice, maxPrice, minRating, inStock]);
 
+  // ── Sync from URL when navigating via client-side navigation
+  useEffect(() => {
+    const cat = searchParams.get('categorySlug') || '';
+    const sr = searchParams.get('search') || '';
+    const sb = searchParams.get('sortBy') || 'popular';
+    const ord = searchParams.get('order') || 'desc';
+    const mp = searchParams.get('minPrice') || '';
+    const Ma = searchParams.get('maxPrice') || '';
+    const mr = searchParams.get('minRating') ? +searchParams.get('minRating')! : null;
+    const st = searchParams.get('inStock') || 'all';
+    const pg = +searchParams.get('page')! || 1;
+    setSelectedCategory(cat);
+    setSearch(sr); setDebouncedSearch(sr);
+    setSortBy(sb); setOrder(ord);
+    setMinPrice(mp); setMaxPrice(Ma);
+    setMinRating(mr); setInStock(st);
+    setPage(pg);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   useEffect(() => { categoriesApi.list().then(r => setCategories(r.data.data)); }, []);
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
-  useEffect(() => { syncToUrl(); }, [syncToUrl]);
+  useEffect(() => { syncToUrl(); });
 
   // ── Filter helpers
   const totalPages = Math.ceil(total / LIMIT);

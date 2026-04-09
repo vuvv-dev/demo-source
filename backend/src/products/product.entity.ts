@@ -42,6 +42,9 @@ export class Product {
   tagline: string;
 
   @Column({ nullable: true })
+  shortDescription: string; // one-line tagline for cards
+
+  @Column({ nullable: true })
   featuredImage: string;
 
   @Column({ type: 'text', nullable: true })

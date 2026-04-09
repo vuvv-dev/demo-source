@@ -154,6 +154,10 @@ export default function ProductCard({ product, viewMode = 'grid' }: ProductCardP
             <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-[#0071e3] text-white text-[10px] font-semibold z-10">
               Giảm {discount}%
             </div>
+          ) : product.extraMetadata?.badge ? (
+            <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-[#1d1d1f]/80 backdrop-blur-sm text-white text-[10px] font-semibold z-10">
+              {product.extraMetadata.badge}
+            </div>
           ) : (
             <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-[#1d1d1f]/80 backdrop-blur-sm text-white text-[10px] font-semibold z-10">
               Mới

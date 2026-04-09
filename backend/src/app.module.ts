@@ -22,14 +22,17 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { WishlistModule } from './wishlist/wishlist.module';
 import { PaymentModule } from './payment/payment.module';
+import { Address } from './addresses/address.entity';
+import { AddressesModule } from './addresses/addresses.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
+import { SeedModule } from './seed/seed.module';
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: process.env.DATABASE_URL || 'postgresql://postgres:postgres123@localhost:5432/apple_store',
-      entities: [User, Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Review, Wishlist],
+      entities: [User, Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Review, Wishlist, Address],
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
     }),
@@ -49,6 +52,8 @@ import { RequestLoggerMiddleware } from './common/middleware/request-logger.midd
     DashboardModule,
     WishlistModule,
     PaymentModule,
+    AddressesModule,
+    SeedModule,
   ],
 })
 export class AppModule implements NestModule {

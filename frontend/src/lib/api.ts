@@ -162,3 +162,12 @@ export const wishlistApi = {
   remove: (productId: string) => api.delete(`/wishlist/${productId}`),
   check: (productId: string) => api.get(`/wishlist/${productId}/status`),
 };
+
+// ─── Addresses ─────────────────────────────────────────────────────────────
+export const addressesApi = {
+  list: () => api.get('/addresses'),
+  create: (data: any) => api.post('/addresses', data),
+  update: (id: string, data: any) => api.patch(`/addresses/${id}`, data),
+  delete: (id: string) => api.delete(`/addresses/${id}`),
+  setDefault: (id: string) => api.patch(`/addresses/${id}/default`),
+};

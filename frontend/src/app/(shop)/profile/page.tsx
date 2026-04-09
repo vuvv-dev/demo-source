@@ -1,11 +1,13 @@
 'use client';
 import { useState } from 'react';
-import { User } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { User, MapPin } from 'lucide-react';
 import { usersApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
 
 export default function ProfilePage() {
+  const router = useRouter();
   const { user, setAuth } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -40,9 +42,18 @@ export default function ProfilePage() {
           <div>
             <p className="text-base font-semibold text-[#1d1d1f]">{user?.name}</p>
             <p className="text-sm text-[#86868b]">{user?.email}</p>
-            <span className="text-xs font-semibold px-3 py-0.5 rounded-full bg-[#dbeafe] text-[#0071e3] mt-1 inline-block">
-              {user?.role === 'admin' ? 'Quản trị' : 'Khách hàng'}
-            </span>
+            <div className="flex gap-2 mt-1.5">
+              <span className="text-xs font-semibold px-3 py-0.5 rounded-full bg-[#dbeafe] text-[#0071e3]">
+                {user?.role === 'admin' ? 'Quản trị' : 'Khách hàng'}
+              </span>
+              <button 
+                onClick={() => router.push('/profile/addresses')}
+                className="text-xs font-semibold px-3 py-0.5 rounded-full bg-[#f5f5f7] text-[#1d1d1f] hover:bg-[#e8e8ed] transition-colors flex items-center gap-1"
+              >
+                <MapPin size={10} />
+                Sổ địa chỉ
+              </button>
+            </div>
           </div>
         </div>
 

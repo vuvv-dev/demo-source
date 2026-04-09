@@ -7,6 +7,7 @@ import { Cart } from '../cart/cart.entity';
 import { CartItem } from '../cart/cart-item.entity';
 import { Product } from '../products/product.entity';
 import { CreateOrderDto, UpdateOrderStatusDto } from './dto/create-order.dto';
+import { AddressesService } from '../addresses/addresses.service';
 
 @Injectable()
 export class OrdersService {
@@ -16,6 +17,7 @@ export class OrdersService {
     @InjectRepository(Cart) private cartRepo: Repository<Cart>,
     @InjectRepository(CartItem) private cartItemRepo: Repository<CartItem>,
     @InjectRepository(Product) private productRepo: Repository<Product>,
+    private addressesService: AddressesService,
   ) {}
 
   private generateOrderNumbers() {
@@ -52,12 +54,26 @@ export class OrdersService {
     }
 
     const { orderNumber, orderCode } = this.generateOrderNumbers();
+
+    let shippingAddress = dto.shippingAddress;
+    if (dto.addressId) {
+      const savedAddress = await this.addressesService.findOne(dto.addressId, userId);
+      shippingAddress = {
+        name: savedAddress.name,
+        phone: savedAddress.phone,
+        address: `${savedAddress.detailAddress}, ${savedAddress.ward}, ${savedAddress.district}`,
+        city: savedAddress.province,
+      };
+    }
+
+    if (!shippingAddress) throw new BadRequestException('Vui lòng cung cấp địa chỉ giao hàng');
+
     const order = this.orderRepo.create({
       orderNumber,
       orderCode,
       user: { id: userId } as any,
       totalAmount,
-      shippingAddress: dto.shippingAddress,
+      shippingAddress,
       paymentMethod: dto.paymentMethod,
       paymentStatus: 'pending',
       note: dto.note,

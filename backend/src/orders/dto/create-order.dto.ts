@@ -9,7 +9,8 @@ export class ShippingAddressDto {
 }
 
 export class CreateOrderDto {
-  @ValidateNested() @Type(() => ShippingAddressDto) shippingAddress: ShippingAddressDto;
+  @IsOptional() @IsString() addressId?: string;
+  @IsOptional() @ValidateNested() @Type(() => ShippingAddressDto) shippingAddress?: ShippingAddressDto;
   @IsString() paymentMethod: 'cod' | 'bank_transfer' | 'credit_card' | 'stripe' | 'payos' = 'cod';
   @IsOptional() @IsString() note?: string;
 }

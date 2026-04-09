@@ -7,9 +7,10 @@ import { OrderItem } from './order-item.entity';
 import { Cart } from '../cart/cart.entity';
 import { CartItem } from '../cart/cart-item.entity';
 import { Product } from '../products/product.entity';
+import { AddressesModule } from '../addresses/addresses.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, OrderItem, Cart, CartItem, Product])],
+  imports: [TypeOrmModule.forFeature([Order, OrderItem, Cart, CartItem, Product]), AddressesModule],
   controllers: [OrdersController],
   providers: [OrdersService],
 })

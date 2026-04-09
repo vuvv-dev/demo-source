@@ -54,7 +54,10 @@
       "Bash(taskkill //F //PID 17088)",
       "Bash(taskkill //F //PID 30468)",
       "Bash(taskkill //F //PID 20468)",
-      "Bash(taskkill //F //PID 1968)"
+      "Bash(taskkill //F //PID 1968)",
+      "Bash(npx nest:*)",
+      "Bash(taskkill //F //PID 25044)",
+      "Bash(xxd)"
     ]
   }
 }

@@ -32,7 +32,7 @@ const navData: NavItem[] = [
     slug: 'iphone',
     label: 'iPhone',
     href: '/products?categorySlug=iphone',
-    featured: { name: 'iPhone', image: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/store-card-13-iphone-nav-202509?wid=400&hei=260&fmt=png-alpha', price: 'Từ 17.990.000đ', slug: 'iphone-16-pro' },
+    featured: { name: 'iPhone', image: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/store-card-13-iphone-nav-202509?wid=400&hei=260&fmt=png-alpha', price: 'Từ 17.990.000đ', slug: '?categorySlug=iphone&sortBy=popular&order=desc' },
     subLinks: [
       { label: 'iPhone 16 Pro', href: '/products/iphone-16-pro' },
       { label: 'iPhone 16', href: '/products/iphone-16' },
@@ -44,7 +44,7 @@ const navData: NavItem[] = [
     slug: 'ipad',
     label: 'iPad',
     href: '/products?categorySlug=ipad',
-    featured: { name: 'iPad', image: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/store-card-13-ipad-nav-202405?wid=400&hei=260&fmt=png-alpha', price: 'Từ 7.990.000đ', slug: 'ipad-pro' },
+    featured: { name: 'iPad', image: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/store-card-13-ipad-nav-202405?wid=400&hei=260&fmt=png-alpha', price: 'Từ 7.990.000đ', slug: '?categorySlug=ipad&sortBy=popular&order=desc' },
     subLinks: [
       { label: 'iPad Pro', href: '/products/ipad-pro' },
       { label: 'iPad Air', href: '/products/ipad-air' },
@@ -56,7 +56,7 @@ const navData: NavItem[] = [
     slug: 'mac',
     label: 'Mac',
     href: '/products?categorySlug=mac',
-    featured: { name: 'Mac', image: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/store-card-13-mac-nav-202603?wid=400&hei=260&fmt=png-alpha', price: 'Từ 16.490.000đ', slug: 'macbook-pro' },
+    featured: { name: 'Mac', image: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/store-card-13-mac-nav-202603?wid=400&hei=260&fmt=png-alpha', price: 'Từ 16.490.000đ', slug: '?categorySlug=mac&sortBy=popular&order=desc' },
     subLinks: [
       { label: 'MacBook Pro', href: '/products/macbook-pro' },
       { label: 'MacBook Air', href: '/products/macbook-air' },
@@ -68,7 +68,7 @@ const navData: NavItem[] = [
     slug: 'airpods',
     label: 'AirPods',
     href: '/products?categorySlug=airpods',
-    featured: { name: 'AirPods', image: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/store-card-13-airpods-nav-202509?wid=400&hei=260&fmt=png-alpha', price: 'Từ 3.490.000đ', slug: 'airpods-pro-2' },
+    featured: { name: 'AirPods', image: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/store-card-13-airpods-nav-202509?wid=400&hei=260&fmt=png-alpha', price: 'Từ 3.490.000đ', slug: '?categorySlug=airpods&sortBy=popular&order=desc' },
     subLinks: [
       { label: 'AirPods Pro 2', href: '/products/airpods-pro-2' },
       { label: 'AirPods 3', href: '/products/airpods-3' },
@@ -80,7 +80,7 @@ const navData: NavItem[] = [
     slug: 'apple-watch',
     label: 'Watch',
     href: '/products?categorySlug=apple-watch',
-    featured: { name: 'Apple Watch', image: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/store-card-13-watch-nav-202509_GEO_VN?wid=400&hei=260&fmt=png-alpha', price: 'Từ 5.990.000đ', slug: 'apple-watch-ultra-2' },
+    featured: { name: 'Apple Watch', image: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/store-card-13-watch-nav-202509_GEO_VN?wid=400&hei=260&fmt=png-alpha', price: 'Từ 5.990.000đ', slug: '?categorySlug=apple-watch&sortBy=popular&order=desc' },
     subLinks: [
       { label: 'Ultra 2', href: '/products/apple-watch-ultra-2' },
       { label: 'Series 10', href: '/products/apple-watch-series-10' },
@@ -92,7 +92,7 @@ const navData: NavItem[] = [
     slug: 'phu-kien',
     label: 'Phụ kiện',
     href: '/products?categorySlug=phu-kien',
-    featured: { name: 'Phụ kiện', image: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/store-card-13-accessories-nav-202603?wid=400&hei=260&fmt=png-alpha', price: 'Xem ngay', slug: 'magsafe-charger' },
+    featured: { name: 'Phụ kiện', image: 'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/store-card-13-accessories-nav-202603?wid=400&hei=260&fmt=png-alpha', price: 'Xem ngay', slug: '?categorySlug=phu-kien&sortBy=popular&order=desc' },
     subLinks: [
       { label: 'Sạc & Cáp', href: '/products?categorySlug=phu-kien' },
       { label: 'Ốp lưng', href: '/products?categorySlug=phu-kien' },

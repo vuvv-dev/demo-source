@@ -13,6 +13,7 @@ export interface Category {
 export interface ProductVariant {
   id: string; name: string; value: string;
   priceModifier: number; stock: number; isActive: boolean;
+  colorHex?: string;
 }
 
 export interface Product {
@@ -24,6 +25,7 @@ export interface Product {
   reviewCount?: number; createdAt: string;
   variants?: ProductVariant[];
   tagline?: string;
+  shortDescription?: string;
   featuredImage?: string;
   whatsInTheBox?: string;
   extraMetadata?: Record<string, any>;

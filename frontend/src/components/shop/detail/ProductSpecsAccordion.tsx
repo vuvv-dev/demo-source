@@ -27,7 +27,7 @@ function AccordionItem({ title, children, isOpen, onToggle }: AccordionItemProps
           <ChevronDown size={18} />
         </div>
       </button>
-      
+
       <div className={cn(
         "overflow-hidden transition-all duration-500 ease-in-out",
         isOpen ? "max-h-[1000px] pb-10 opacity-100" : "max-h-0 opacity-0"

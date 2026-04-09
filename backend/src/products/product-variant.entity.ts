@@ -23,7 +23,10 @@ export class ProductVariant {
   @Column({ default: 0 })
   stock: number;
 
-  @Column({ default: true })
+  @Column({ nullable: true })
+  colorHex: string; // e.g. "#1d1d1f" — for color swatches
+
+  @Column({ nullable: true })
   isActive: boolean;
 
   @CreateDateColumn()
