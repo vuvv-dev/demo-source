@@ -7,7 +7,6 @@ import {
   Truck,
   CheckCircle2,
   Lock,
-  ChevronRight,
   MapPin,
   Plus,
   ShieldCheck,
@@ -22,7 +21,7 @@ import { useCartStore } from '@/store/cartStore';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
 import vnDataRaw from '@/data/vietnam-provinces.json';
-import VietQRModal from '@/components/shop/VietQRModal';
+import VietQRPayment from '@/components/shop/VietQRPayment';
 
 function QrCodeIcon({ size = 18, className = '' }: { size?: number; className?: string }) {
   return <QrCode size={size} className={className} />;
@@ -30,7 +29,7 @@ function QrCodeIcon({ size = 18, className = '' }: { size?: number; className?: 
 
 const vnData = ((vnDataRaw as any).default || vnDataRaw) as any[];
 
-type Step = 'address' | 'payment' | 'review';
+type Step = 'address' | 'payment' | 'review' | 'qr';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -63,8 +62,8 @@ export default function CheckoutPage() {
 
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [note, setNote] = useState('');
-  const [showQRModal, setShowQRModal] = useState(false);
   const [qrOrderId, setQrOrderId] = useState<string | null>(null);
+  const [qrTotal, setQrTotal] = useState<number>(0);
 
   // Calculate Shipping
   const subtotal = getTotal();
@@ -134,6 +133,7 @@ export default function CheckoutPage() {
   const prevStep = () => {
     if (currentStep === 'payment') setCurrentStep('address');
     if (currentStep === 'review') setCurrentStep('payment');
+    if (currentStep === 'qr') { setQrOrderId(null); setCurrentStep('review'); }
   };
 
   const handleSubmit = async () => {
@@ -157,10 +157,11 @@ export default function CheckoutPage() {
 
       const res = await ordersApi.create(payload);
 
-      // bank_transfer: show QR modal after order is created
+      // bank_transfer: show QR payment inline after order is created
       if (paymentMethod === 'bank_transfer') {
         setQrOrderId(res.data.data.id);
-        setShowQRModal(true);
+        setQrTotal(total);
+        setCurrentStep('qr');
         return;
       }
 
@@ -205,22 +206,26 @@ export default function CheckoutPage() {
             {[
               { id: 'address', label: 'Giao hàng' },
               { id: 'payment', label: 'Thanh toán' },
-              { id: 'review', label: 'Hoàn tất' }
-            ].map((step, idx) => (
+              { id: 'review', label: 'Hoàn tất' },
+              { id: 'qr', label: 'QR Code' }
+            ].map((step, idx) => {
+              const steps = ['address', 'payment', 'review', 'qr'];
+              const stepIdx = steps.indexOf(currentStep);
+              return (
               <div key={step.id} className="flex items-center">
                 <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-all ${
-                  currentStep === step.id 
-                    ? 'bg-[#0071e3] text-white shadow-lg shadow-blue-500/30' 
-                    : (idx < ['address', 'payment', 'review'].indexOf(currentStep) ? 'bg-[#34c759] text-white' : 'bg-white text-[#86868b] border border-[#d2d2d7]')
+                  currentStep === step.id
+                    ? 'bg-[#0071e3] text-white shadow-lg shadow-blue-500/30'
+                    : (idx < stepIdx ? 'bg-[#34c759] text-white' : 'bg-white text-[#86868b] border border-[#d2d2d7]')
                 }`}>
-                  {idx < ['address', 'payment', 'review'].indexOf(currentStep) ? <CheckCircle2 size={16} /> : idx + 1}
+                  {idx < stepIdx ? <CheckCircle2 size={16} /> : idx + 1}
                 </div>
                 <span className={`ml-2 text-sm font-medium ${currentStep === step.id ? 'text-[#1d1d1f]' : 'text-[#86868b]'}`}>
                   {step.label}
                 </span>
-                {idx < 2 && <div className="mx-4 w-8 h-px bg-[#d2d2d7]" />}
+                {idx < 3 && <div className="mx-4 w-8 h-px bg-[#d2d2d7]" />}
               </div>
-            ))}
+            )})}
           </div>
         </div>
 
@@ -395,6 +400,34 @@ export default function CheckoutPage() {
               </div>
             )}
 
+            {/* STEP 4: QR PAYMENT */}
+            {currentStep === 'qr' && qrOrderId && (
+              <div className="animate-in fade-in zoom-in-95 duration-500">
+                <div className="bg-white rounded-[24px] p-8 border border-[#f0f0f0] shadow-sm">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#0071e3] to-[#005bb5] flex items-center justify-center">
+                      <QrCode size={20} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-[#1d1d1f]">Thanh toán qua QR</h3>
+                      <p className="text-sm text-[#86868b]">Quét mã QR ngân hàng (VietQR)</p>
+                    </div>
+                  </div>
+                  <VietQRPayment
+                    orderId={qrOrderId}
+                    orderNumber=""
+                    amount={qrTotal}
+                    paymentMethod="bank_transfer"
+                    onConfirmed={() => { setItems([]); router.push('/orders'); }}
+                  />
+                </div>
+                <button onClick={prevStep} className="w-full mt-4 bg-white border border-[#d2d2d7] text-[#1d1d1f] py-4 rounded-[18px] font-semibold hover:bg-[#f5f5f7] flex items-center justify-center gap-2">
+                  <ArrowLeft size={20} />
+                  Quay lại kiểm tra đơn hàng
+                </button>
+              </div>
+            )}
+
             {/* STEP 3: REVIEW */}
             {currentStep === 'review' && (
               <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
@@ -538,17 +571,6 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {/* VietQR Modal */}
-      {showQRModal && qrOrderId && (
-        <VietQRModal
-          orderId={qrOrderId}
-          orderNumber=""
-          amount={total}
-          paymentMethod="bank_transfer"
-          onClose={() => { setShowQRModal(false); router.push('/orders'); }}
-          onConfirmed={() => { setShowQRModal(false); setItems([]); router.push('/orders'); }}
-        />
-      )}
     </div>
   );
 }

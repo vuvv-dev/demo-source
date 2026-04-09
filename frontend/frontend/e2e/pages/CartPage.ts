@@ -18,7 +18,7 @@ export class CartPage {
     this.checkoutButton = page.locator('a[href="/checkout"], button:has-text("Thanh toán"), button:has-text("Checkout")').first();
     this.removeItemButtons = page.locator('button:has-text("Xóa"), button:has-text("Remove")');
     this.quantityInputs = page.locator('input[type="number"]');
-    this.totalPrice = page.locator('text=/\\d{1,3}(\\.\\d{3})*₫/).last();
+    this.totalPrice = page.locator(`text=/\\d{1,3}(\\.\\d{3})*[\u20ABd]/`).last();
     this.cartCount = page.locator('[data-testid="cart-count"], span[class*="cart"]');
     this.continueShoppingLink = page.locator('a[href="/products"], a[href="/"]');
   }
