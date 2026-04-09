@@ -193,6 +193,11 @@ jobs:
             if [ "$NEEDS_CERT" = "true" ]; then
               echo "==> Requesting SSL cert for $DOMAIN..."
 
+              # Kill any process holding port 8888 (e.g. stale container from previous run)
+              docker rm -f demo-nginx-acme 2>/dev/null || true
+              fuser -k 8888/tcp 2>/dev/null || true
+              sleep 1
+
               # Write standalone nginx for ACME challenge on port 8888
               cat > /tmp/nginx-acme.conf << ACMEEOF
             server {
@@ -207,7 +212,6 @@ jobs:
               mkdir -p /var/www/certbot-demo
 
               # Start temp nginx for ACME
-              docker rm -f demo-nginx-acme 2>/dev/null || true
               docker run -d \
                 --name demo-nginx-acme \
                 --restart unless-stopped \
