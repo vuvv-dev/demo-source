@@ -68,7 +68,11 @@
       "Bash(npm show:*)",
       "WebFetch(domain:sepay.vn)",
       "WebFetch(domain:docs.sepay.vn)",
-      "WebFetch(domain:qr.sepay.vn)"
+      "WebFetch(domain:qr.sepay.vn)",
+      "Bash(grep -E \"^public$\")",
+      "Bash(grep -E \"^public$|^.github$|docker|next.config|.env\")",
+      "Bash(ls /d/a_project/docimal/docimal-client/.env*)",
+      "Bash(ls /d/a_project/docimal/docimal-client/nginx*)"
     ]
   }
 }

@@ -11,6 +11,10 @@ Add these secrets in **Settings → Secrets and variables → Actions** of your 
 | `VPS_SSH_KEY` | **Private** SSH private key for connecting to VPS | Paste the full `-----BEGIN OPENSSH PRIVATE KEY----- ... -----END OPENSSH PRIVATE KEY-----` |
 | `VPS_SSH_PASSPHRASE` | Passphrase for the SSH key (if any) | Leave empty if key has no passphrase |
 | `VPS_SSH_PORT` | SSH port number (optional, defaults to `22`) | `22` |
+| `FRONTEND_ENV` | Nội dung file `.env` cho frontend (tất cả biến môi trường, mỗi dòng một `KEY=VALUE`) | (xem bên dưới) |
+| `BACKEND_ENV` | Nội dung file `.env` cho backend (tất cả biến môi trường) | (xem bên dưới) |
+| `FRONTEND_DOMAIN` | Domain để deploy | `demo.docimal.site` |
+| `SSL_EMAIL` | Email đăng ký SSL (Let's Encrypt) | `your@email.com` |
 
 ## How to Find / Set These Values
 
@@ -53,4 +57,51 @@ Usually `22`. If your VPS uses a custom SSH port, change this accordingly.
 
 ## Verification
 
-After adding secrets, push to `main` or `master` branch to trigger the workflow and verify it works.
+## FRONTEND_ENV
+
+Là **toàn bộ nội dung file `.env.production`** của frontend, mỗi dòng một `KEY=VALUE`. Ví dụ:
+
+```
+NEXT_PUBLIC_API_URL=https://demo.docimal.site/api
+NEXT_PUBLIC_APP_URL=https://demo.docimal.site
+NEXT_PUBLIC_APP_NAME=Apple Store Demo
+```
+
+### Cách lấy giá trị
+
+Trên máy local, xem file `.env.production` của frontend rồi copy toàn bộ nội dung (không có dòng trống thừa):
+
+```bash
+cat /path/to/frontend/.env.production
+```
+
+Paste kết quả vào secret `FRONTEND_ENV` (giữ nguyên format `KEY=VALUE`, mỗi dòng một biến).
+
+---
+
+## BACKEND_ENV
+
+Là **toàn bộ nội dung file `.env`** của backend. Ví dụ:
+
+```
+DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/apple_store
+JWT_SECRET=your-super-secret-jwt-key-change-this
+NODE_ENV=production
+PORT=3001
+```
+
+### Cách lấy giá trị
+
+```bash
+cat /path/to/backend/.env
+```
+
+Paste kết quả vào secret `BACKEND_ENV`.
+
+> **Lưu ý:** Không để ký tự xuống dòng thừa ở cuối file trong secret. GitHub Actions sẽ ghi đúng nội dung vào file `.env` trên VPS.
+
+---
+
+## Sau khi thêm secrets
+
+Push lên nhánh `main` hoặc `dev` để kích hoạt workflow, hoặc chạy thủ công từ **Actions → Deploy to VPS → Run workflow**.

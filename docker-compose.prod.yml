@@ -21,9 +21,9 @@ services:
     image: ${REGISTRY:-ghcr.io/yourusername}/docimal-backend:latest
     container_name: apple-store-api-prod
     restart: unless-stopped
+    env_file:
+      - .env.backend
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres123}@postgres:5432/${POSTGRES_DB:-apple_store}
-      JWT_SECRET: ${JWT_SECRET:-apple-store-secret-key}
       PORT: 3001
       NODE_ENV: production
     depends_on:
@@ -36,12 +36,11 @@ services:
     image: ${REGISTRY:-ghcr.io/yourusername}/docimal-frontend:latest
     container_name: apple-store-frontend-prod
     restart: unless-stopped
+    env_file:
+      - .env.frontend
     environment:
-      NEXT_PUBLIC_API_URL: /api/v1
       NODE_ENV: production
       PORT: 3000
-    depends_on:
-      - backend
     networks:
       - app-network
 
@@ -51,9 +50,12 @@ services:
     restart: unless-stopped
     ports:
       - '80:80'
-      # - "443:443" # Uncomment when setting up SSL
+      - '443:443'
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - /var/www/certbot
     depends_on:
       - frontend
       - backend
@@ -62,6 +64,8 @@ services:
 
 volumes:
   postgres_data:
+  certbot-etc:
+  certbot-var:
 
 networks:
   app-network:
