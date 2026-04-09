@@ -152,7 +152,7 @@ async function seed() {
     { name: 'Apple Vision', slug: 'vision-standard', price: 54990000, cat: 'vision', tagline: 'Mang thực tế ảo đến mọi nhà.', img: 'https://images.unsplash.com/photo-1632733711679-5292d6e4922f?w=800' },
 
     // --- AirPods (10 items) ---
-    { name: 'AirPods Pro 3', slug: 'ap-pro-3', price: 6990000, cat: 'airpods', tagline: 'Chống ồn cải tiến vượt bậc.', img: 'https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=800' },
+    { name: 'AirPods Pro 3', slug: 'ap-pro-3', price: 6990000, cat: 'airpods', tagline: 'Chống ồn cải tiến vượt bậc.', img: 'https://images.unsplash.com/photo-1606220838315-056192d5e927?w=800' },
     { name: 'AirPods Max 2', slug: 'ap-max-2', price: 15490000, cat: 'airpods', tagline: 'Màu mới, âm thanh mới.', img: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800' },
     { name: 'AirPods (Gen 4)', slug: 'ap-4', price: 3990000, cat: 'airpods', tagline: 'Thiết kế mới cho mọi tai.' },
     { name: 'AirPods Pro 2', slug: 'ap-pro-2', price: 5990000, cat: 'airpods' },

@@ -2,8 +2,10 @@ import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { SeedService } from './seed/seed.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -23,6 +25,15 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
+
+  // ── Auto-seed if database is empty ──────────────────────────────────────
+  const dataSource = app.get(DataSource);
+  const productCount = await dataSource.getRepository('Product').count();
+  if (productCount === 0) {
+    console.log('📦 Database is empty — running seed automatically...');
+    const seedService = app.get(SeedService);
+    await seedService.seed();
+  }
 
   await app.listen(port);
   console.log(`🚀 Backend running at http://localhost:${port}`);
