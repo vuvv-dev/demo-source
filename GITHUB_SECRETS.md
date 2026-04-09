@@ -13,8 +13,6 @@ Add these secrets in **Settings → Secrets and variables → Actions** of your 
 | `VPS_SSH_PORT` | SSH port number (optional, defaults to `22`) | `22` |
 | `FRONTEND_ENV` | Nội dung file `.env` cho frontend (tất cả biến môi trường, mỗi dòng một `KEY=VALUE`) | (xem bên dưới) |
 | `BACKEND_ENV` | Nội dung file `.env` cho backend (tất cả biến môi trường) | (xem bên dưới) |
-| `FRONTEND_DOMAIN` | Domain để deploy | `demo.docimal.site` |
-| `SSL_EMAIL` | Email đăng ký SSL (Let's Encrypt) | `your@email.com` |
 
 ## How to Find / Set These Values
 
@@ -66,6 +64,8 @@ NEXT_PUBLIC_API_URL=https://demo.docimal.site/api
 NEXT_PUBLIC_APP_URL=https://demo.docimal.site
 NEXT_PUBLIC_APP_NAME=Apple Store Demo
 ```
+
+> **HTTPS:** SSL được handle bởi nginx của docimal-client (port 443 chính). docimal-client sẽ proxy `https://demo.docimal.site` → `http://<VPS_IP>:8073`. Không cần `SSL_EMAIL` secret nữa.
 
 ### Cách lấy giá trị
 

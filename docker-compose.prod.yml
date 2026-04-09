@@ -49,13 +49,9 @@ services:
     container_name: apple-store-nginx
     restart: unless-stopped
     ports:
-      - '80:80'
-      - '443:443'
+      - '${NGINX_PUBLIC_PORT:-8073}:80'
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - certbot-etc:/etc/letsencrypt
-      - certbot-var:/var/lib/letsencrypt
-      - /var/www/certbot
     depends_on:
       - frontend
       - backend
@@ -64,8 +60,6 @@ services:
 
 volumes:
   postgres_data:
-  certbot-etc:
-  certbot-var:
 
 networks:
   app-network:
