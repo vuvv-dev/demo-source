@@ -11,18 +11,30 @@ Add these secrets in **Settings → Secrets and variables → Actions** of your 
 | `VPS_SSH_KEY` | **Private** SSH private key for connecting to VPS | Paste the full `-----BEGIN OPENSSH PRIVATE KEY----- ... -----END OPENSSH PRIVATE KEY-----` |
 | `VPS_SSH_PASSPHRASE` | Passphrase for the SSH key (if any) | Leave empty if key has no passphrase |
 | `VPS_SSH_PORT` | SSH port number (optional, defaults to `22`) | `22` |
-| `FRONTEND_ENV` | Nội dung file `.env` cho frontend (tất cả biến môi trường, mỗi dòng một `KEY=VALUE`) | (xem bên dưới) |
-| `BACKEND_ENV` | Nội dung file `.env` cho backend (tất cả biến môi trường) | (xem bên dưới) |
+| `SSL_EMAIL` | Email for Let's Encrypt SSL certificate registration | `admin@docimal.site` |
+| `FRONTEND_ENV` | Nội dung file `.env` cho frontend (mỗi dòng một `KEY=VALUE`) | (xem bên dưới) |
+| `BACKEND_ENV` | Nội dung file `.env` cho backend (mỗi dòng một `KEY=VALUE`) | (xem bên dưới) |
 
-## How to Find / Set These Values
+---
 
-### 1. `VPS_HOST`
-Your VPS public IP address. Find it from your cloud provider (AWS EC2, DigitalOcean, Vultr, etc.) or run `curl -4 ifconfig.me` on the server.
+## `VPS_HOST`
 
-### 2. `VPS_SSH_USER`
+Your VPS public IP address. Find it from your cloud provider (AWS EC2, DigitalOcean, Vultr, etc.) or run on the server:
+
+```bash
+curl -4 ifconfig.me
+```
+
+---
+
+## `VPS_SSH_USER`
+
 Run `whoami` on your VPS to get the current user. Usually `root` or `ubuntu`.
 
-### 3. `VPS_SSH_KEY`
+---
+
+## `VPS_SSH_KEY`
+
 On your **local machine** (not the server), run:
 
 ```bash
@@ -47,15 +59,27 @@ On the VPS, add the public key to `~/.ssh/authorized_keys`:
 echo "ssh-ed25519 AAAA... github-actions-deploy" >> ~/.ssh/authorized_keys
 ```
 
-### 4. `VPS_SSH_PASSPHRASE`
+---
+
+## `VPS_SSH_PASSPHRASE`
+
 Leave empty if your SSH key has no passphrase. If you set a passphrase when generating the key, enter it here.
 
-### 5. `VPS_SSH_PORT`
+---
+
+## `VPS_SSH_PORT`
+
 Usually `22`. If your VPS uses a custom SSH port, change this accordingly.
 
-## Verification
+---
 
-## FRONTEND_ENV
+## `SSL_EMAIL`
+
+Email address used when registering/renewing the Let's Encrypt SSL certificate via certbot. certbot sends expiry notices to this address.
+
+---
+
+## `FRONTEND_ENV`
 
 Là **toàn bộ nội dung file `.env.production`** của frontend, mỗi dòng một `KEY=VALUE`. Ví dụ:
 
@@ -65,11 +89,9 @@ NEXT_PUBLIC_APP_URL=https://demo.docimal.site
 NEXT_PUBLIC_APP_NAME=Apple Store Demo
 ```
 
-> **HTTPS:** SSL được handle bởi nginx của docimal-client (port 443 chính). docimal-client sẽ proxy `https://demo.docimal.site` → `http://<VPS_IP>:8073`. Không cần `SSL_EMAIL` secret nữa.
-
 ### Cách lấy giá trị
 
-Trên máy local, xem file `.env.production` của frontend rồi copy toàn bộ nội dung (không có dòng trống thừa):
+Trên máy local, xem file `.env.production` của frontend rồi copy toàn bộ nội dung:
 
 ```bash
 cat /path/to/frontend/.env.production
@@ -77,9 +99,11 @@ cat /path/to/frontend/.env.production
 
 Paste kết quả vào secret `FRONTEND_ENV` (giữ nguyên format `KEY=VALUE`, mỗi dòng một biến).
 
+> **Lưu ý:** Không để dòng trống thừa ở cuối file trong secret. GitHub Actions sẽ ghi đúng nội dung vào file `.env` trên VPS.
+
 ---
 
-## BACKEND_ENV
+## `BACKEND_ENV`
 
 Là **toàn bộ nội dung file `.env`** của backend. Ví dụ:
 
@@ -98,10 +122,23 @@ cat /path/to/backend/.env
 
 Paste kết quả vào secret `BACKEND_ENV`.
 
-> **Lưu ý:** Không để ký tự xuống dòng thừa ở cuối file trong secret. GitHub Actions sẽ ghi đúng nội dung vào file `.env` trên VPS.
+> **Lưu ý:** Không để ký tự xuống dòng thừa ở cuối file trong secret.
 
 ---
 
 ## Sau khi thêm secrets
 
 Push lên nhánh `main` hoặc `dev` để kích hoạt workflow, hoặc chạy thủ công từ **Actions → Deploy to VPS → Run workflow**.
+
+### Deployment Flow
+
+1. **Build & Push** → Docker images built and pushed to GHCR
+2. **SSL Certificate** → certbot requests/renews certs via standalone on port 8888 (avoids port 80 conflict with docimal-client)
+3. **Deploy via SSH** → VPS pulls images, runs `docker compose`
+4. **Public ports**: HTTP → `8073`, HTTPS → `8074`
+5. **Domain**: `https://demo.docimal.site:8074`
+6. **API**: `https://demo.docimal.site:8074/api`
+
+### DNS Requirement
+
+Trước khi deploy lần đầu, đảm bảo DNS record cho `demo.docimal.site` trỏ về VPS IP (`VPS_HOST`).
