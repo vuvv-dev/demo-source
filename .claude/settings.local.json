@@ -72,7 +72,8 @@
       "Bash(grep -E \"^public$\")",
       "Bash(grep -E \"^public$|^.github$|docker|next.config|.env\")",
       "Bash(ls /d/a_project/docimal/docimal-client/.env*)",
-      "Bash(ls /d/a_project/docimal/docimal-client/nginx*)"
+      "Bash(ls /d/a_project/docimal/docimal-client/nginx*)",
+      "Read(//d/a_project/docimal/docimal-core/**)"
     ]
   }
 }

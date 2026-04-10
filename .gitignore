@@ -13,6 +13,10 @@ backend/dist/
 .env.*
 !.env.example
 
+# Deploy configs (template files are checked in; no .env or secrets)
+deploy/.env*
+deploy/*.local.*
+
 # OS files
 .DS_Store
 Thumbs.db
@@ -30,3 +34,5 @@ yarn-error.log*
 
 # TypeScript
 *.tsbuildinfo
+
+.claude
