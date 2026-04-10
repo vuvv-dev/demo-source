@@ -33,7 +33,7 @@ import { SeedModule } from './seed/seed.module';
       type: 'postgres',
       url: process.env.DATABASE_URL || 'postgresql://postgres:postgres123@localhost:5432/apple_store',
       entities: [User, Category, Product, ProductVariant, Cart, CartItem, Order, OrderItem, Review, Wishlist, Address],
-      synchronize: process.env.NODE_ENV !== 'production',
+      synchronize: process.env.NODE_ENV !== 'production' || process.env.DB_SYNC === 'true' || true,
       logging: process.env.NODE_ENV === 'development',
     }),
     PassportModule,
