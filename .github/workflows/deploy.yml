@@ -259,12 +259,22 @@ jobs:
             # ── 1. Prepare webroot directory ──────────────────────────
             mkdir -p "$WEBROOT"
 
-            # ── 2. Backup current nginx config ─────────────────────────
-            cp "$NGINX_CONF" "${NGINX_CONF}.bak" 2>/dev/null || true
-            echo "Current nginx config backed up."
+            # ── 2. Backup current nginx config (if exists) ─────────────
+            NGINX_ENABLED="/etc/nginx/sites-enabled/$DOMAIN"
+            if [ -f "$NGINX_CONF" ]; then
+              cp "$NGINX_CONF" "${NGINX_CONF}.bak" 2>/dev/null || true
+              echo "Current nginx config backed up."
+            fi
 
-            # ── 3. Switch to ACME-only nginx config (envsubst from SCP'd template) ──
-            #    Uses /tmp so no YAML indentation issues
+            # ── 3. Ensure nginx sites-enabled symlink exists ───────────
+            #    docimal-client pattern: always ensure the symlink is present
+            mkdir -p /etc/nginx/sites-enabled
+            if [ ! -L "$NGINX_ENABLED" ]; then
+              ln -sf "$NGINX_CONF" "$NGINX_ENABLED"
+              echo "Created symlink: $NGINX_ENABLED"
+            fi
+
+            # ── 4. Write ACME-only nginx config ───────────────────────────
             DOMAIN="$DOMAIN" WEBROOT="$WEBROOT" \
               envsubst '${DOMAIN} ${WEBROOT}' \
               > "$NGINX_CONF" << 'EOF'
@@ -272,11 +282,11 @@ jobs:
                 listen 80;
                 listen [::]:80;
                 server_name ${DOMAIN};
-            
+
                 location /.well-known/acme-challenge/ {
                     root ${WEBROOT};
                 }
-            
+
                 location / {
                     return 503;
                 }
@@ -299,26 +309,34 @@ jobs:
             fi
             echo "Switched to temporary ACME-only config."
 
-            # ── 4. Verify ACME endpoint reachable ─────────────────────
-            echo "Verifying ACME endpoint..."
+            # ── 5. Verify ACME endpoint reachable via domain ────────────
+            #    Must check the DOMAIN, not 127.0.0.1 (which hits the default server)
+            echo "Verifying ACME endpoint for $DOMAIN..."
             MAX_ATTEMPTS=10
             for i in $(seq 1 $MAX_ATTEMPTS); do
-              if curl -sf "http://127.0.0.1/.well-known/acme-challenge/test" > /dev/null 2>&1; then
-                echo "ACME endpoint reachable (attempt $i)"
+              HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" \
+                "http://$DOMAIN/.well-known/acme-challenge/test" 2>/dev/null)
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "ACME endpoint reachable (HTTP $HTTP_CODE, attempt $i)"
                 break
               fi
               if [ "$i" -eq "$MAX_ATTEMPTS" ]; then
-                echo "[ERROR] ACME endpoint not reachable after $MAX_ATTEMPTS attempts."
-                journalctl -u nginx --no-pager -n 20 2>/dev/null || cat /var/log/nginx/error.log 2>/dev/null || true
-                cp "${NGINX_CONF}.bak" "$NGINX_CONF" 2>/dev/null || true
-                nginx -t && nginx -s reload 2>/dev/null || true
+                echo "[ERROR] ACME endpoint not reachable after $MAX_ATTEMPTS attempts (got HTTP $HTTP_CODE)."
+                # Try to restore previous config
+                if [ -f "${NGINX_CONF}.bak" ]; then
+                  cp "${NGINX_CONF}.bak" "$NGINX_CONF"
+                  nginx -t 2>/dev/null && nginx -s reload 2>/dev/null || true
+                  echo "Restored previous nginx config."
+                fi
+                journalctl -u nginx --no-pager -n 20 2>/dev/null || \
+                  cat /var/log/nginx/error.log 2>/dev/null || true
                 exit 1
               fi
-              echo "Waiting for nginx to reload... ($i/$MAX_ATTEMPTS)"
+              echo "Waiting for nginx to reload... ($i/$MAX_ATTEMPTS, got HTTP $HTTP_CODE)"
               sleep 2
             done
 
-            # ── 5. Request / renew certificate ────────────────────────
+            # ── 6. Request / renew certificate ────────────────────────
             echo "Requesting SSL certificate..."
             certbot certonly \
               --webroot \
@@ -331,7 +349,7 @@ jobs:
 
             echo "SSL certificate obtained for $DOMAIN"
 
-            # ── 6. Restore full SSL nginx config ─────────────────────
+            # ── 7. Restore full SSL nginx config ─────────────────────
             #    envsubst pattern avoids YAML indentation issues
             DOMAIN="$DOMAIN" \
             WEBROOT="$WEBROOT" \
@@ -439,7 +457,7 @@ jobs:
               echo "[WARN] Could not reload nginx."
             fi
 
-            # ── 7. Verify new certificate ─────────────────────────────
+            # ── 8. Verify new certificate ─────────────────────────────
             echo ""
             echo "--- New Certificate Verification ---"
             openssl x509 -in "$CERT_FILE" -noout -subject -dates -serial -fingerprint
