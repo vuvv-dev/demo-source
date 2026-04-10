@@ -94,9 +94,6 @@ jobs:
   check-ssl:
     needs: build-and-push
     runs-on: ubuntu-latest
-    outputs:
-      needs_renewal: ${{ steps.ssl.outputs.needs_renewal }}
-      days_left: ${{ steps.ssl.outputs.days_left }}
     steps:
       - name: Check SSL certificate on VPS
         id: ssl
@@ -121,8 +118,6 @@ jobs:
             # 1. Check if cert exists
             if [ ! -f "$CERT_FILE" ]; then
               echo "[ERROR] No certificate found at $CERT_FILE"
-              echo "needs_renewal=true" >> $GITHUB_OUTPUT
-              echo "days_left=0" >> $GITHUB_OUTPUT
               exit 0
             fi
 
@@ -149,10 +144,7 @@ jobs:
             elif [ "$DAYS_LEFT" -le 30 ]; then
               echo "Status:         WARNING (<=30 days)"
             else
-              echo "Status:         OK"
             fi
-
-            echo "days_left=$DAYS_LEFT" >> $GITHUB_OUTPUT
 
             # 4. Chain verification
             echo ""
@@ -218,7 +210,6 @@ jobs:
             else
               echo "RESULT: Certificate is healthy"
             fi
-            echo "needs_renewal=$NEEDS_RENEWAL" >> $GITHUB_OUTPUT
             echo "============================================"
 
   # ─────────────────────────────────────────────────────────────
@@ -228,8 +219,7 @@ jobs:
     needs: [build-and-push, check-ssl]
     if: |
       always() &&
-      needs.check-ssl.result == 'success' &&
-      (needs.check-ssl.outputs.needs_renewal == 'true' || github.event.inputs.force_deploy == 'true')
+      needs.check-ssl.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Renew SSL certificate
@@ -252,6 +242,19 @@ jobs:
             CERT_FILE="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
 
             echo "=== SSL Renewal: $DOMAIN ==="
+
+            # ── 0. Verify if renewal is actually needed ─────────────
+            FORCE_DEPLOY="${{ github.event.inputs.force_deploy }}"
+            if [ -f "$CERT_FILE" ] && [ "$FORCE_DEPLOY" != "true" ]; then
+              EXPIRY=$(openssl x509 -enddate -noout -in "$CERT_FILE" 2>/dev/null | cut -d= -f2)
+              EXPIRY_EPOCH=$(date -d "$EXPIRY" +%s 2>/dev/null || date -jf "%b %d %T %Y %Z" "$EXPIRY" +%s 2>/dev/null)
+              NOW_EPOCH=$(date +%s)
+              DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
+              if [ "$DAYS_LEFT" -gt 30 ]; then
+                echo "Certificate is healthy ($DAYS_LEFT days left). Skipping renewal."
+                exit 0
+              fi
+            fi
 
             # ── 1. Prepare webroot directory ──────────────────────────
             mkdir -p "$WEBROOT"
