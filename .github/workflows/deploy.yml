@@ -1,28 +1,16 @@
 name: Deploy to VPS
 
-# ================================================================
-# Triggers
-# ================================================================
 on:
   push:
     branches:
       - main
       - dev
   workflow_dispatch:
-    inputs:
-      force_deploy:
-        description: 'Force deploy even if cert is valid'
-        required: false
-        default: 'false'
-        type: boolean
 
-# ================================================================
-# Shared environment
-# ================================================================
 env:
   REGISTRY: ghcr.io
   DOMAIN: demo.docimal.site
-  WEBROOT_PATH: /var/www/certbot-demo
+  WEBROOT: /var/www/certbot-demo
   NGINX_HTTP: "8073"
   NGINX_HTTPS: "8074"
   BACKEND_PORT: "6074"
@@ -30,209 +18,58 @@ env:
   DEPLOY_DIR: /srv/docimal-demo
   IMAGE_NAME: ${{ github.repository }}
 
-# ================================================================
-# Jobs
-# ================================================================
 jobs:
 
-  # ─────────────────────────────────────────────────────────────
-  # JOB 1: Build & Push Docker images
-  # ─────────────────────────────────────────────────────────────
+  # ── Build & Push Docker images ─────────────────────────────────
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    outputs:
-      sha: ${{ steps.vars.outputs.sha }}
-      image_tag: ${{ steps.vars.outputs.image_tag }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set image tag
-        id: vars
         run: |
-          echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "image_tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_OUTPUT
+        id: vars
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container registry
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Backend
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: ./backend
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ steps.vars.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ steps.vars.outputs.IMAGE_TAG }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:main
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build and push Frontend
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: ./frontend
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ steps.vars.outputs.image_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ steps.vars.outputs.IMAGE_TAG }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:main
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ─────────────────────────────────────────────────────────────
-  # JOB 2: Check SSL Certificate
-  # ─────────────────────────────────────────────────────────────
-  check-ssl:
+  # ── Deploy ─────────────────────────────────────────────────────
+  deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Check SSL certificate on VPS
-        id: ssl
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_SSH_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
-          port: ${{ secrets.VPS_SSH_PORT }}
-          script: |
-            set -euo pipefail
+      - uses: actions/checkout@v4
 
-            DOMAIN="${{ env.DOMAIN }}"
-            CERT_FILE="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
-
-            echo "============================================"
-            echo "  SSL Certificate Review: $DOMAIN"
-            echo "  Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-            echo "============================================"
-
-            # 1. Check if cert exists
-            if [ ! -f "$CERT_FILE" ]; then
-              echo "[ERROR] No certificate found at $CERT_FILE"
-              exit 0
-            fi
-
-            # 2. Certificate details
-            echo ""
-            echo "--- Certificate Details ---"
-            openssl x509 -in "$CERT_FILE" -noout -subject -issuer -dates -serial -fingerprint 2>/dev/null || true
-
-            # 3. Expiry check
-            EXPIRY=$(openssl x509 -enddate -noout -in "$CERT_FILE" 2>/dev/null | cut -d= -f2)
-            EXPIRY_EPOCH=$(date -d "$EXPIRY" +%s 2>/dev/null || date -jf "%b %d %T %Y %Z" "$EXPIRY" +%s 2>/dev/null)
-            NOW_EPOCH=$(date +%s)
-            DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
-
-            echo ""
-            echo "--- Expiry Status ---"
-            echo "Expires:        $EXPIRY"
-            echo "Days remaining: $DAYS_LEFT"
-
-            if [ "$DAYS_LEFT" -le 0 ]; then
-              echo "Status:         EXPIRED"
-            elif [ "$DAYS_LEFT" -le 7 ]; then
-              echo "Status:         CRITICAL (<=7 days)"
-            elif [ "$DAYS_LEFT" -le 30 ]; then
-              echo "Status:         WARNING (<=30 days)"
-            else
-            fi
-
-            # 4. Chain verification
-            echo ""
-            echo "--- Chain Verification ---"
-            openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt "$CERT_FILE" 2>&1 || echo "[WARN] Chain verification issue"
-
-            # 5. Domain match
-            echo ""
-            echo "--- Domain Match ---"
-            CERT_CN=$(openssl x509 -in "$CERT_FILE" -noout -subject 2>/dev/null | grep -oP 'CN\s*=\s*\K.*' || echo "N/A")
-            echo "Common Name: $CERT_CN"
-            if echo "$CERT_CN" | grep -q "$DOMAIN"; then
-              echo "Domain match: OK"
-            else
-              echo "[ERROR] Domain mismatch! Certificate CN=$CERT_CN, expected $DOMAIN"
-            fi
-
-            # 6. SSL connection test
-            echo ""
-            echo "--- SSL Connection Test ---"
-            echo | openssl s_client -connect "$DOMAIN:443" -servername "$DOMAIN" -brief 2>/dev/null || echo "[WARN] SSL connection test failed"
-
-            # 7. TLS version support
-            echo ""
-            echo "--- TLS Version Support ---"
-            for VER in tls1_2 tls1_3; do
-              if echo | openssl s_client -connect "$DOMAIN:443" -servername "$DOMAIN" -$VER 2>/dev/null | grep -q "Verify return code: 0"; then
-                echo "$VER: SUPPORTED"
-              else
-                echo "$VER: NOT AVAILABLE"
-              fi
-            done
-
-            # 8. HSTS header
-            echo ""
-            echo "--- HSTS Header ---"
-            HSTS=$(curl -sI "https://$DOMAIN" 2>/dev/null | grep -i "strict-transport-security" || echo "NOT SET")
-            echo "HSTS: $HSTS"
-
-            # 9. Nginx SSL config
-            echo ""
-            echo "--- Nginx SSL Config ---"
-            NGINX_CONF="/etc/nginx/sites-available/$DOMAIN"
-            if [ -f "$NGINX_CONF" ]; then
-              grep -E "ssl_certificate|ssl_protocols|listen 443" "$NGINX_CONF" 2>/dev/null || echo "No SSL directives found"
-            else
-              echo "[WARN] Nginx config not found at $NGINX_CONF"
-            fi
-
-            # 10. Certbot status
-            echo ""
-            echo "--- Certbot Status ---"
-            certbot certificates --cert-name "$DOMAIN" 2>/dev/null || echo "Could not query certbot"
-
-            # Determine renewal need
-            NEEDS_RENEWAL="false"
-            if [ "$DAYS_LEFT" -le 0 ]; then
-              echo "RESULT: Certificate EXPIRED"
-              NEEDS_RENEWAL="true"
-            elif [ "$DAYS_LEFT" -le 30 ]; then
-              echo "RESULT: Certificate expiring soon (<=30 days)"
-              NEEDS_RENEWAL="true"
-            else
-              echo "RESULT: Certificate is healthy"
-            fi
-            echo "============================================"
-
-
-  # ─────────────────────────────────────────────────────────────
-  # JOB 4: Deploy containers
-  # ─────────────────────────────────────────────────────────────
-  deploy:
-    needs: [build-and-push, check-ssl]
-    if: |
-      always() &&
-      needs.build-and-push.result == 'success' &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set image tag
-        id: vars
-        run: |
-          echo "image_tag=${{ needs.build-and-push.outputs.image_tag }}" >> $GITHUB_OUTPUT
-
-      - name: Copy deploy config to VPS
+      - name: Copy deploy files to VPS
         uses: appleboy/scp-action@v0.1.4
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -244,7 +81,7 @@ jobs:
           source: deploy/*
           target: "${{ env.DEPLOY_DIR }}/"
 
-      - name: Deploy containers on VPS
+      - name: Deploy & SSL on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -257,188 +94,133 @@ jobs:
           script: |
             set -euo pipefail
 
-            DEPLOY_DIR="${{ env.DEPLOY_DIR }}"
+            DOMAIN="${{ env.DOMAIN }}"
+            WEBROOT="${{ env.WEBROOT }}"
             REGISTRY="${{ env.REGISTRY }}"
             IMAGE_NAME="${{ env.IMAGE_NAME }}"
-            IMAGE_TAG="${{ needs.build-and-push.outputs.image_tag }}"
-            DOMAIN="${{ env.DOMAIN }}"
-            BACKEND_PORT="${{ env.BACKEND_PORT }}"
+            IMAGE_TAG="${{ needs.build-and-push.outputs.IMAGE_TAG }}"
+            NGINX_HTTP="${{ env.NGINX_HTTP }}"
             NGINX_HTTPS="${{ env.NGINX_HTTPS }}"
+            BACKEND_PORT="${{ env.BACKEND_PORT }}"
+            FRONTEND_PORT="${{ env.FRONTEND_PORT }}"
+            SSL_EMAIL="${{ secrets.SSL_EMAIL }}"
+            DEPLOY_DIR="${{ env.DEPLOY_DIR }}"
 
-            echo "============================================"
-            echo "  Deploying demo-source"
-            echo "  SHA: $IMAGE_TAG"
-            echo "  Domain: $DOMAIN"
-            echo "  Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-            echo "============================================"
+            echo "=== Deploying: SHA=$IMAGE_TAG ==="
 
-            cd "$DEPLOY_DIR"
+            mkdir -p "$DEPLOY_DIR" "$DEPLOY_DIR/nginx" "$WEBROOT"
+            mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
 
-            # ── 1. Prepare directories ────────────────────────────────
-            mkdir -p "$DEPLOY_DIR"
-            mkdir -p "$DEPLOY_DIR/nginx"
-
-            # ── 2. Write env files ────────────────────────────────────
-            printf '%s\n' "${{ secrets.FRONTEND_ENV }}" > .env.frontend
-            printf '%s\n' "${{ secrets.BACKEND_ENV }}" > .env.backend
-            chmod 600 .env.frontend .env.backend
+            # ── Env files ───────────────────────────────────────────
+            printf '%s\n' "${{ secrets.FRONTEND_ENV }}" > "$DEPLOY_DIR/.env.frontend"
+            printf '%s\n' "${{ secrets.BACKEND_ENV }}" > "$DEPLOY_DIR/.env.backend"
+            chmod 600 "$DEPLOY_DIR/.env.frontend" "$DEPLOY_DIR/.env.backend"
             echo "Env files written."
 
-            # ── 3. Render docker-compose.yml with envsubst ─────────────
-            cp docker-compose.prod.yml docker-compose.yml
-
+            # ── Docker compose ───────────────────────────────────────
             REGISTRY="$REGISTRY" \
             IMAGE_NAME="$IMAGE_NAME" \
             IMAGE_TAG="$IMAGE_TAG" \
             DOMAIN="$DOMAIN" \
-            DOMAIN="$DOMAIN" \
               envsubst '${REGISTRY} ${IMAGE_NAME} ${IMAGE_TAG} ${DOMAIN}' \
-              < docker-compose.prod.yml \
-              > docker-compose.yml
-
+              < "$DEPLOY_DIR/docker-compose.prod.yml" \
+              > "$DEPLOY_DIR/docker-compose.yml"
             echo "docker-compose.yml rendered."
 
-            # ── 4. Nginx config ───────────────────────────────────────
-            #    On first deploy, $NGINX_CONF may not exist yet (renew-ssl will create it)
-            NGINX_SITE="/etc/nginx/sites-available/$DOMAIN"
-            if [ -f "$NGINX_SITE" ]; then
-              echo "Nginx site config found at $NGINX_SITE."
+            # ── Nginx SSL setup ──────────────────────────────────────
+            NGINX_CONF="/etc/nginx/sites-available/$DOMAIN"
+            NGINX_ENABLED="/etc/nginx/sites-enabled/$DOMAIN"
+
+            # 1. Backup & symlink
+            cp "$NGINX_CONF" "$NGINX_CONF.bak" 2>/dev/null || true
+            if [ ! -L "$NGINX_ENABLED" ]; then
+              ln -sf "$NGINX_CONF" "$NGINX_ENABLED"
+            fi
+
+            # 2. ACME-only config
+            DOMAIN="$DOMAIN" WEBROOT="$WEBROOT" \
+              envsubst '${DOMAIN} ${WEBROOT}' \
+              > "$NGINX_CONF" << 'ACMEEOF'
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+    location /.well-known/acme-challenge/ {
+        root ${WEBROOT};
+    }
+    location / { return 503; }
+}
+ACMEEOF
+
+            nginx -t && systemctl reload nginx || nginx -t && nginx -s reload
+            sleep 3
+
+            # 3. Certbot
+            if certbot certonly --webroot -w "$WEBROOT" -d "$DOMAIN" \
+               --email "$SSL_EMAIL" --agree-tos --non-interactive 2>&1 | grep -q "Certificate is saved"; then
+              echo "SSL cert obtained."
             else
-              echo "No nginx site config at $NGINX_SITE (first deploy needs renew-ssl to create it)."
+              echo "SSL cert may already exist or certbot ran."
             fi
 
-            # ── 5. Docker login ─────────────────────────────────────
-            echo "${{ secrets.GITHUB_TOKEN }}" | \
-              docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+            # 4. Full SSL config
+            DOMAIN="$DOMAIN" WEBROOT="$WEBROOT" \
+            BACKEND_PORT="$BACKEND_PORT" FRONTEND_PORT="$FRONTEND_PORT" \
+              envsubst '${DOMAIN} ${WEBROOT} ${BACKEND_PORT} ${FRONTEND_PORT}' \
+              > "$NGINX_CONF" << 'SSLEOF'
+upstream demo_backend { server 127.0.0.1:${BACKEND_PORT}; keepalive 32; }
+upstream demo_frontend { server 127.0.0.1:${FRONTEND_PORT}; keepalive 32; }
 
-            # ── 6. Smart image pull with fallback tags ────────────────
-            IMAGE_BASE="$REGISTRY/$IMAGE_NAME"
-            FINAL_IMAGE=""
-            PULL_SUCCESS=false
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+    location /.well-known/acme-challenge/ { root ${WEBROOT}; }
+    location / { return 301 https://$server_name$request_uri; }
+}
 
-            for TAG in "$IMAGE_TAG" "main" "latest"; do
-              echo "==> Trying image: ${IMAGE_BASE}-backend:${TAG}"
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${DOMAIN};
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_session_timeout 1d;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    add_header Strict-Transport-Security "max-age=63072000" always;
+    client_max_body_size 50M;
 
-              for i in 1 2 3; do
-                if docker pull "${IMAGE_BASE}-backend:${TAG}" 2>/dev/null; then
-                  echo "Pull successful: ${IMAGE_BASE}-backend:${TAG}"
-                  FINAL_IMAGE="${IMAGE_BASE}-backend:${TAG}"
-                  PULL_SUCCESS=true
-                  break 2
-                fi
-                echo "  Pull failed (attempt $i/3) — retrying..."
-                echo "${{ secrets.GITHUB_TOKEN }}" | \
-                  docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin 2>/dev/null || true
-                sleep $((i * 5))
-              done
-              echo "Tag ${TAG} unavailable, trying next..."
-            done
+    location /api/ {
+        proxy_pass http://demo_backend/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    location / {
+        proxy_pass http://demo_frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+SSLEOF
 
-            if [ "$PULL_SUCCESS" = false ]; then
-              echo "ERROR: Failed to pull any backend image tag!"
-              exit 1
-            fi
+            nginx -t && systemctl reload nginx || nginx -t && nginx -s reload
+            echo "Nginx SSL config applied."
 
-            echo "==> Using backend image: $FINAL_IMAGE"
+            # ── Docker ───────────────────────────────────────────────
+            cd "$DEPLOY_DIR"
+            docker login "$REGISTRY" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+            docker compose down 2>/dev/null || true
+            docker compose up -d --remove-orphans
+            echo "Containers started."
+            docker ps --filter "name=demo-"
 
-            # Pull frontend image with fallback
-            echo "==> Pulling frontend image..."
-            docker pull "${IMAGE_BASE}-frontend:${IMAGE_TAG}" 2>/dev/null || \
-              docker pull "${IMAGE_BASE}-frontend:main" 2>/dev/null || \
-              docker pull "${IMAGE_BASE}-frontend:latest"
-            echo "Frontend image pulled."
-
-            # ── 7. Stop & remove old containers ──────────────────────
-            echo "==> Stopping old containers..."
-            docker compose -f docker-compose.yml down 2>/dev/null || true
-
-            # ── 8. Start new containers ──────────────────────────────
-            echo "==> Starting containers..."
-            docker compose -f docker-compose.yml up -d --remove-orphans
-
-            # ── 9. Health check loop ─────────────────────────────────
             echo ""
-            echo "--- Health Check ---"
-
-            # 9a. PostgreSQL
-            echo "Waiting for PostgreSQL..."
-            for i in $(seq 1 30); do
-              if docker exec demo-postgres pg_isready -U postgres -d apple_store > /dev/null 2>&1; then
-                echo "PostgreSQL ready! ($i/30)"
-                break
-              fi
-              if [ "$i" -eq 30 ]; then
-                echo "[ERROR] PostgreSQL not ready after 30 attempts."
-                docker logs demo-postgres --tail 20
-                exit 1
-              fi
-              sleep 2
-            done
-
-            # 9b. Backend health endpoint
-            echo "Waiting for backend..."
-            for i in $(seq 1 30); do
-              if curl -sf "http://127.0.0.1:$BACKEND_PORT/api/health" > /dev/null 2>&1; then
-                echo "Backend healthy! ($i/30)"
-                break
-              fi
-              if [ "$i" -eq 30 ]; then
-                echo "[ERROR] Backend not healthy after 30 attempts."
-                docker logs demo-backend --tail 20
-                exit 1
-              fi
-              sleep 2
-            done
-
-            # 9c. Nginx / HTTPS
-            echo "Waiting for HTTPS..."
-            sleep 5
-            for i in $(seq 1 15); do
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://127.0.0.1:$NGINX_HTTPS/" 2>/dev/null)
-              if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
-                echo "HTTPS OK! (HTTP $HTTP_CODE, attempt $i/15)"
-                break
-              fi
-              if [ "$i" -eq 15 ]; then
-                echo "[WARN] HTTPS check returned HTTP $HTTP_CODE after 15 attempts."
-                echo "Container may still be starting. Continuing..."
-              fi
-              sleep 2
-            done
-
-            # ── 10. Final status ───────────────────────────────────────
-            echo ""
-            echo "============================================"
-            echo "  Deployment Complete!"
-            echo "  SHA: $IMAGE_TAG"
-            echo "============================================"
-            echo ""
-            echo "Containers:"
-            docker ps --filter "name=demo-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-            echo ""
+            echo "=== Done ==="
             echo "Frontend: https://$DOMAIN"
             echo "API:      https://$DOMAIN/api"
-            echo ""
-            echo "--- Post-deploy SSL verification ---"
-            curl -sI "https://$DOMAIN" | head -5
-
-  # ─────────────────────────────────────────────────────────────
-  # JOB 5: Notify
-  # ─────────────────────────────────────────────────────────────
-  notify:
-    needs: deploy
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Success notification
-        if: success()
-        run: |
-          echo "demo-source deployed successfully!"
-          echo "SHA: ${{ needs.build-and-push.outputs.image_tag }}"
-          echo "Domain: ${{ env.DOMAIN }}"
-
-      - name: Failure notification
-        if: failure()
-        run: |
-          echo "demo-source deployment FAILED!"
-          exit 1
