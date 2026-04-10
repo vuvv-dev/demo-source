@@ -28,7 +28,6 @@ env:
   BACKEND_PORT: "6074"
   FRONTEND_PORT: "6073"
   DEPLOY_DIR: /srv/docimal-demo
-  # IMAGE_TAG will be set per job
   IMAGE_NAME: ${{ github.repository }}
 
 # ================================================================
@@ -67,7 +66,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Backend
       - name: Build and push Backend
         uses: docker/build-push-action@v5
         with:
@@ -79,7 +77,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Frontend
       - name: Build and push Frontend
         uses: docker/build-push-action@v5
         with:
@@ -263,27 +260,25 @@ jobs:
             cp "$NGINX_CONF" "${NGINX_CONF}.bak" 2>/dev/null || true
             echo "Current nginx config backed up."
 
-            # ── 3. Switch to ACME-only nginx config ───────────────────
-            #    (docimal-client pattern: nginx already running, just reload)
-            cat > "$NGINX_CONF" << 'ACMEEOF'
-server {
-    listen 80;
-    listen [::]:80;
-    server_name __DOMAIN__;
-
-    location /.well-known/acme-challenge/ {
-        root __WEBROOT_PATH__;
-    }
-
-    location / {
-        return 503;
-    }
-}
-ACMEEOF
-
-            # Substitute placeholders
-            sed -i "s/__DOMAIN__/$DOMAIN/g" "$NGINX_CONF"
-            sed -i "s|__WEBROOT_PATH__|$WEBROOT|g" "$NGINX_CONF"
+            # ── 3. Switch to ACME-only nginx config (envsubst from SCP'd template) ──
+            #    Uses /tmp so no YAML indentation issues
+            DOMAIN="$DOMAIN" WEBROOT="$WEBROOT" \
+              envsubst '${DOMAIN} ${WEBROOT}' \
+              > "$NGINX_CONF" << 'EOF'
+            server {
+                listen 80;
+                listen [::]:80;
+                server_name ${DOMAIN};
+            
+                location /.well-known/acme-challenge/ {
+                    root ${WEBROOT};
+                }
+            
+                location / {
+                    return 503;
+                }
+            }
+            EOF
 
             # Validate and reload nginx
             if ! nginx -t 2>&1 | grep -q "syntax is ok"; then
@@ -297,8 +292,7 @@ ACMEEOF
             elif nginx -s reload 2>/dev/null; then
               echo "Nginx reloaded (signal)."
             else
-              echo "[WARN] Could not reload nginx — may not be running as systemd service."
-              echo "Trying nginx -t and continuing anyway..."
+              echo "[WARN] Could not reload nginx — not a systemd service."
             fi
             echo "Switched to temporary ACME-only config."
 
@@ -312,10 +306,7 @@ ACMEEOF
               fi
               if [ "$i" -eq "$MAX_ATTEMPTS" ]; then
                 echo "[ERROR] ACME endpoint not reachable after $MAX_ATTEMPTS attempts."
-                echo "Nginx error log:"
-                journalctl -u nginx --no-pager -n 20 2>/dev/null || \
-                  cat /var/log/nginx/error.log 2>/dev/null || echo "(no logs found)"
-                # Restore nginx config before exiting
+                journalctl -u nginx --no-pager -n 20 2>/dev/null || cat /var/log/nginx/error.log 2>/dev/null || true
                 cp "${NGINX_CONF}.bak" "$NGINX_CONF" 2>/dev/null || true
                 nginx -t && nginx -s reload 2>/dev/null || true
                 exit 1
@@ -338,99 +329,97 @@ ACMEEOF
             echo "SSL certificate obtained for $DOMAIN"
 
             # ── 6. Restore full SSL nginx config ─────────────────────
-            cat > "$NGINX_CONF" << 'NGINXEOF'
-upstream demo_backend {
-    server 127.0.0.1:__BACKEND_PORT__;
-    keepalive 32;
-}
-
-upstream demo_frontend {
-    server 127.0.0.1:__FRONTEND_PORT__;
-    keepalive 32;
-}
-
-server {
-    listen 80;
-    listen [::]:80;
-    server_name __DOMAIN__;
-
-    location /.well-known/acme-challenge/ {
-        root __WEBROOT_PATH__;
-    }
-
-    location / {
-        return 301 https://$server_name$request_uri;
-    }
-}
-
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name __DOMAIN__;
-    server_tokens off;
-
-    ssl_certificate /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
-    ssl_trusted_certificate /etc/letsencrypt/live/__DOMAIN__/chain.pem;
-
-    ssl_session_timeout 1d;
-    ssl_session_cache shared:SSL:50m;
-    ssl_session_tickets off;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers off;
-
-    add_header Strict-Transport-Security "max-age=63072000" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    access_log /var/log/nginx/docimal-demo_access.log;
-    error_log  /var/log/nginx/docimal-demo_error.log;
-
-    gzip on;
-    gzip_vary on;
-    gzip_proxied any;
-    gzip_comp_level 6;
-    gzip_types text/plain text/css text/xml application/json
-                application/javascript application/rss+xml
-                application/atom+xml image/svg+xml;
-
-    client_max_body_size 50M;
-    proxy_connect_timeout 60s;
-    proxy_send_timeout 60s;
-    proxy_read_timeout 60s;
-
-    location /api/ {
-        proxy_pass http://demo_backend/api/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-
-    location / {
-        proxy_pass http://demo_frontend;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-}
-NGINXEOF
-
-            # Substitute placeholders
-            sed -i "s/__DOMAIN__/$DOMAIN/g" "$NGINX_CONF"
-            sed -i "s|__WEBROOT_PATH__|$WEBROOT|g" "$NGINX_CONF"
-            sed -i "s/__BACKEND_PORT__/${{ env.BACKEND_PORT }}/g" "$NGINX_CONF"
-            sed -i "s/__FRONTEND_PORT__/${{ env.FRONTEND_PORT }}/g" "$NGINX_CONF"
+            #    envsubst pattern avoids YAML indentation issues
+            DOMAIN="$DOMAIN" \
+            WEBROOT="$WEBROOT" \
+            BACKEND_PORT="${{ env.BACKEND_PORT }}" \
+            FRONTEND_PORT="${{ env.FRONTEND_PORT }}" \
+              envsubst '${DOMAIN} ${WEBROOT} ${BACKEND_PORT} ${FRONTEND_PORT}' \
+              > "$NGINX_CONF" << 'EOF'
+            upstream demo_backend {
+                server 127.0.0.1:${BACKEND_PORT};
+                keepalive 32;
+            }
+            
+            upstream demo_frontend {
+                server 127.0.0.1:${FRONTEND_PORT};
+                keepalive 32;
+            }
+            
+            server {
+                listen 80;
+                listen [::]:80;
+                server_name ${DOMAIN};
+            
+                location /.well-known/acme-challenge/ {
+                    root ${WEBROOT};
+                }
+            
+                location / {
+                    return 301 https://$server_name$request_uri;
+                }
+            }
+            
+            server {
+                listen 443 ssl http2;
+                listen [::]:443 ssl http2;
+                server_name ${DOMAIN};
+                server_tokens off;
+            
+                ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+                ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+                ssl_trusted_certificate /etc/letsencrypt/live/${DOMAIN}/chain.pem;
+            
+                ssl_session_timeout 1d;
+                ssl_session_cache shared:SSL:50m;
+                ssl_session_tickets off;
+                ssl_protocols TLSv1.2 TLSv1.3;
+                ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+                ssl_prefer_server_ciphers off;
+            
+                add_header Strict-Transport-Security "max-age=63072000" always;
+                add_header X-Frame-Options "SAMEORIGIN" always;
+                add_header X-Content-Type-Options "nosniff" always;
+                add_header X-XSS-Protection "1; mode=block" always;
+                add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            
+                access_log /var/log/nginx/docimal-demo_access.log;
+                error_log  /var/log/nginx/docimal-demo_error.log;
+            
+                gzip on;
+                gzip_vary on;
+                gzip_proxied any;
+                gzip_comp_level 6;
+                gzip_types text/plain text/css text/xml application/json application/javascript application/rss+xml application/atom+xml image/svg+xml;
+            
+                client_max_body_size 50M;
+                proxy_connect_timeout 60s;
+                proxy_send_timeout 60s;
+                proxy_read_timeout 60s;
+            
+                location /api/ {
+                    proxy_pass http://demo_backend/api/;
+                    proxy_http_version 1.1;
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                    proxy_set_header Upgrade $http_upgrade;
+                    proxy_set_header Connection "upgrade";
+                }
+            
+                location / {
+                    proxy_pass http://demo_frontend;
+                    proxy_http_version 1.1;
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                    proxy_set_header Upgrade $http_upgrade;
+                    proxy_set_header Connection "upgrade";
+                }
+            }
+            EOF
 
             # Validate and reload
             if ! nginx -t 2>&1 | grep -q "syntax is ok"; then
@@ -454,7 +443,7 @@ NGINXEOF
             echo ""
             echo "--- Post-Renewal SSL Test ---"
             sleep 3
-            curl -sI "https://$DOMAIN" | head -5 || echo "[INFO] HTTPS check pending (nginx may still be reloading)"
+            curl -sI "https://$DOMAIN" | head -5 || echo "[INFO] HTTPS check pending"
             echo ""
             echo "SSL renewal completed successfully!"
 
@@ -477,7 +466,6 @@ NGINXEOF
         run: |
           echo "image_tag=${{ needs.build-and-push.outputs.image_tag }}" >> $GITHUB_OUTPUT
 
-      # ── SCP: deploy/ directory ──────────────────────────────────
       - name: Copy deploy config to VPS
         uses: appleboy/scp-action@v0.1.4
         with:
@@ -490,25 +478,6 @@ NGINXEOF
           source: deploy/*
           target: "${{ env.DEPLOY_DIR }}/"
 
-      # ── SCP: backend Dockerfile for multi-stage build on VPS ────
-      #    (Optional: uncomment if you want to build on VPS instead of GHA)
-      # - name: Copy backend Dockerfile to VPS
-      #   uses: appleboy/scp-action@v0.1.4
-      #   with:
-      #     host: ${{ secrets.VPS_HOST }}
-      #     username: ${{ secrets.VPS_SSH_USER }}
-      #     key: ${{ secrets.VPS_SSH_KEY }}
-      #     passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
-      #     port: ${{ secrets.VPS_SSH_PORT }}
-      #     source: |
-      #       backend/Dockerfile
-      #       backend/package.json
-      #       backend/package-lock.json
-      #       backend/tsconfig.json
-      #       backend/src/
-      #     target: "${{ env.DEPLOY_DIR }}/backend-src/"
-
-      # ── Deploy via SSH ─────────────────────────────────────────
       - name: Deploy containers on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -527,6 +496,8 @@ NGINXEOF
             IMAGE_NAME="${{ env.IMAGE_NAME }}"
             IMAGE_TAG="${{ needs.build-and-push.outputs.image_tag }}"
             DOMAIN="${{ env.DOMAIN }}"
+            BACKEND_PORT="${{ env.BACKEND_PORT }}"
+            NGINX_HTTPS="${{ env.NGINX_HTTPS }}"
 
             echo "============================================"
             echo "  Deploying demo-source"
@@ -542,40 +513,32 @@ NGINXEOF
             mkdir -p "$DEPLOY_DIR/nginx"
 
             # ── 2. Write env files ────────────────────────────────────
-            #    FRONTEND_ENV and BACKEND_ENV are multi-line secrets
-            #    written via printf to preserve newlines
             printf '%s\n' "${{ secrets.FRONTEND_ENV }}" > .env.frontend
             printf '%s\n' "${{ secrets.BACKEND_ENV }}" > .env.backend
             chmod 600 .env.frontend .env.backend
             echo "Env files written."
 
-            # ── 3. Write docker-compose.prod.yml with actual values ───
-            #    (replace __PLACEHOLDERS__ from the SCP'd template)
+            # ── 3. Render docker-compose.yml with envsubst ─────────────
             cp docker-compose.prod.yml docker-compose.yml
 
-            # Substitute env vars into docker-compose.yml
             REGISTRY="$REGISTRY" \
             IMAGE_NAME="$IMAGE_NAME" \
             IMAGE_TAG="$IMAGE_TAG" \
             DOMAIN="$DOMAIN" \
-            envsubst \
+            DOMAIN="$DOMAIN" \
+              envsubst '${REGISTRY} ${IMAGE_NAME} ${IMAGE_TAG} ${DOMAIN}' \
               < docker-compose.prod.yml \
               > docker-compose.yml
 
             echo "docker-compose.yml rendered."
 
-            # ── 4. Nginx config — link to site-available ─────────────
+            # ── 4. Nginx config ───────────────────────────────────────
+            #    On first deploy, $NGINX_CONF may not exist yet (renew-ssl will create it)
             NGINX_SITE="/etc/nginx/sites-available/$DOMAIN"
-            NGINX_ENABLED="/etc/nginx/sites-enabled/$DOMAIN"
-
-            # If site-available file doesn't exist yet (first deploy),
-            # it will be created by the renew-ssl job.
-            # Here we also copy the local nginx.conf into the deploy dir
-            # so the nginx container can bind-mount it.
             if [ -f "$NGINX_SITE" ]; then
-              echo "Nginx site config found at $NGINX_SITE — using existing config."
+              echo "Nginx site config found at $NGINX_SITE."
             else
-              echo "No nginx site config at $NGINX_SITE — renew-ssl will create it on first run."
+              echo "No nginx site config at $NGINX_SITE (first deploy needs renew-ssl to create it)."
             fi
 
             # ── 5. Docker login ─────────────────────────────────────
@@ -583,13 +546,11 @@ NGINXEOF
               docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
 
             # ── 6. Smart image pull with fallback tags ────────────────
-            #    Strategy: SHA → main → latest (robust retry logic from docimal-core)
             IMAGE_BASE="$REGISTRY/$IMAGE_NAME"
             FINAL_IMAGE=""
             PULL_SUCCESS=false
 
             for TAG in "$IMAGE_TAG" "main" "latest"; do
-              # Skip duplicate if TAG == IMAGE_TAG == "main" etc.
               echo "==> Trying image: ${IMAGE_BASE}-backend:${TAG}"
 
               for i in 1 2 3; do
@@ -600,11 +561,8 @@ NGINXEOF
                   break 2
                 fi
                 echo "  Pull failed (attempt $i/3) — retrying..."
-
-                # Re-login before retry (token might have expired mid-pull)
                 echo "${{ secrets.GITHUB_TOKEN }}" | \
                   docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin 2>/dev/null || true
-
                 sleep $((i * 5))
               done
               echo "Tag ${TAG} unavailable, trying next..."
@@ -617,9 +575,8 @@ NGINXEOF
 
             echo "==> Using backend image: $FINAL_IMAGE"
 
-            # Also pull frontend image
-            FRONTEND_IMAGE="${IMAGE_BASE}-frontend:${TAG:-latest}"
-            echo "==> Pulling frontend: ${IMAGE_BASE}-frontend:${IMAGE_TAG}"
+            # Pull frontend image with fallback
+            echo "==> Pulling frontend image..."
             docker pull "${IMAGE_BASE}-frontend:${IMAGE_TAG}" 2>/dev/null || \
               docker pull "${IMAGE_BASE}-frontend:main" 2>/dev/null || \
               docker pull "${IMAGE_BASE}-frontend:latest"
@@ -655,7 +612,7 @@ NGINXEOF
             # 9b. Backend health endpoint
             echo "Waiting for backend..."
             for i in $(seq 1 30); do
-              if curl -sf "http://127.0.0.1:${{ env.BACKEND_PORT }}/api/health" > /dev/null 2>&1; then
+              if curl -sf "http://127.0.0.1:$BACKEND_PORT/api/health" > /dev/null 2>&1; then
                 echo "Backend healthy! ($i/30)"
                 break
               fi
@@ -671,7 +628,7 @@ NGINXEOF
             echo "Waiting for HTTPS..."
             sleep 5
             for i in $(seq 1 15); do
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://127.0.0.1:${{ env.NGINX_HTTPS }}/" 2>/dev/null)
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://127.0.0.1:$NGINX_HTTPS/" 2>/dev/null)
               if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
                 echo "HTTPS OK! (HTTP $HTTP_CODE, attempt $i/15)"
                 break
@@ -708,14 +665,14 @@ NGINXEOF
     runs-on: ubuntu-latest
     steps:
       - name: Success notification
-        if: needs.deploy.result == 'success'
+        if: success()
         run: |
-          echo "✅ demo-source deployed successfully!"
-          echo "   SHA: ${{ needs.build-and-push.outputs.image_tag }}"
-          echo "   Domain: ${{ env.DOMAIN }}"
+          echo "demo-source deployed successfully!"
+          echo "SHA: ${{ needs.build-and-push.outputs.image_tag }}"
+          echo "Domain: ${{ env.DOMAIN }}"
 
       - name: Failure notification
-        if: needs.deploy.result == 'failure'
+        if: failure()
         run: |
-          echo "❌ demo-source deployment FAILED!"
+          echo "demo-source deployment FAILED!"
           exit 1
