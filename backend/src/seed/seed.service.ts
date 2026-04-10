@@ -1,19 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
 import { Product } from '../products/product.entity';
 import { ProductVariant } from '../products/product-variant.entity';
 import { Category } from '../categories/category.entity';
 import { Review } from '../reviews/review.entity';
+import { User } from '../users/user.entity';
+import { Cart } from '../cart/cart.entity';
 
 @Injectable()
 export class SeedService {
+  private defaultCustomer: User | null = null;
+
   constructor(
     @InjectRepository(Product) private productRepo: Repository<Product>,
     @InjectRepository(ProductVariant) private variantRepo: Repository<ProductVariant>,
     @InjectRepository(Category) private categoryRepo: Repository<Category>,
     @InjectRepository(Review) private reviewRepo: Repository<Review>,
-  ) {}
+    @InjectRepository(User) private userRepo: Repository<User>,
+    @InjectRepository(Cart) private cartRepo: Repository<Cart>,
+  ) { }
 
   // ─────────────────────────────────────────────────────────────────────────
   // PUBLIC ENTRY POINT
@@ -22,6 +29,7 @@ export class SeedService {
     console.log('🌱 Starting seed...');
     const start = Date.now();
 
+    await this.seedUsers();
     await this.seedCategories();
     await this.seedProducts();
 
@@ -34,11 +42,34 @@ export class SeedService {
   async clearAll() {
     // Clear in correct FK order: reviews → variants → products → categories
     // CartItems are cascade-deleted via onDelete: CASCADE on Product FK (added to cart-item.entity)
+    await this.cartRepo.createQueryBuilder().delete().execute();
     await this.reviewRepo.createQueryBuilder().delete().execute();
     await this.variantRepo.createQueryBuilder().delete().execute();
     await this.productRepo.createQueryBuilder().delete().execute();
     await this.categoryRepo.createQueryBuilder().delete().execute();
+    await this.userRepo.createQueryBuilder().delete().execute();
     console.log('🗑️  All data cleared');
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // USERS
+  // ─────────────────────────────────────────────────────────────────────────
+  private async seedUsers() {
+    let admin = await this.userRepo.findOne({ where: { email: 'admin@apple-store.vn' } });
+    if (!admin) {
+      const adminHash = await bcrypt.hash('Admin@123', 10);
+      admin = await this.userRepo.save({ email: 'admin@apple-store.vn', password: adminHash, name: 'Store Admin', role: 'admin', phone: '0901234567' } as any);
+      await this.cartRepo.save({ user: admin } as any);
+    }
+
+    let customer = await this.userRepo.findOne({ where: { email: 'customer@test.vn' } });
+    if (!customer) {
+      const userHash = await bcrypt.hash('Test@123', 10);
+      customer = await this.userRepo.save({ email: 'customer@test.vn', password: userHash, name: 'Nguyễn Văn A', role: 'customer', phone: '0912345678', address: '123 Nguyễn Trãi, Quận 1, TP.HCM' } as any);
+      await this.cartRepo.save({ user: customer } as any);
+    }
+    this.defaultCustomer = customer;
+    console.log(`  👤 Users seeded (Admin & Customer)`);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -95,6 +126,62 @@ export class SeedService {
         image: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400',
         metadata: { bannerColor: '#1d1d1f', icon: '📺' },
       },
+      {
+        name: 'Android',
+        slug: 'android',
+        description: 'Điện thoại Samsung, Xiaomi, OPPO, Vivo',
+        image: 'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=400',
+        metadata: { bannerColor: '#1428a0', icon: '📱' },
+      },
+      {
+        name: 'Laptop',
+        slug: 'laptop',
+        description: 'Laptop Dell, Lenovo, HP, ASUS, Acer',
+        image: 'https://images.unsplash.com/photo-1496181133206-85ce8bf82248?w=400',
+        metadata: { bannerColor: '#1d1d1f', icon: '💻' },
+      },
+      {
+        name: 'Tablet',
+        slug: 'tablet',
+        description: 'Samsung Galaxy Tab, Xiaomi Pad, OPPO Pad',
+        image: 'https://images.unsplash.com/photo-1561154464-82e9adf32764?w=400',
+        metadata: { bannerColor: '#1d1d1f', icon: '📲' },
+      },
+      {
+        name: 'Tai Nghe',
+        slug: 'tai-nghe',
+        description: 'Tai nghe Sony, Bose, JBL, Samsung, Xiaomi',
+        image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400',
+        metadata: { bannerColor: '#1d1d1f', icon: '🎧' },
+      },
+      {
+        name: 'Loa & Âm Thanh',
+        slug: 'loa-am-thanh',
+        description: 'Loa Bluetooth, loa thông minh, soundbar',
+        image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400',
+        metadata: { bannerColor: '#1d1d1f', icon: '🔊' },
+      },
+      {
+        name: 'Camera',
+        slug: 'camera',
+        description: 'Máy ảnh Canon, Sony, Fujifilm, action camera',
+        image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=400',
+        metadata: { bannerColor: '#1d1d1f', icon: '📷' },
+      },
+      {
+        name: 'Gaming',
+        slug: 'gaming',
+        description: 'Tay cầm, tai nghe gaming, bàn phím, chuột gaming',
+        image: 'https://images.unsplash.com/photo-1593305841991-05c297ba4575?w=400',
+        metadata: { bannerColor: '#7b2cbf', icon: '🎮' },
+      },
+      {
+        name: 'Smart Home',
+        slug: 'smart-home',
+        description: 'Đèn thông minh, camera giám sát, router, thiết bị IoT',
+        image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400',
+        metadata: { bannerColor: '#1d1d1f', icon: '🏠' },
+      },
     ];
 
     for (const cat of categories) {
@@ -121,6 +208,14 @@ export class SeedService {
       this.genAirPods(catMap['airpods']),
       this.genAccessories(catMap['phu-kien']),
       this.genTV(catMap['tv']),
+      // this.genAndroid(catMap['android']),
+      // this.genLaptops(catMap['laptop']),
+      // this.genTablets(catMap['tablet']),
+      // this.genHeadphones(catMap['tai-nghe']),
+      // this.genSpeakers(catMap['loa-am-thanh']),
+      // this.genCameras(catMap['camera']),
+      // this.genGaming(catMap['gaming']),
+      // this.genSmartHome(catMap['smart-home']),
     ];
 
     let count = 0;

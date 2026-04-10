@@ -26,14 +26,14 @@ async function bootstrap() {
     .build();
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
 
-  // ── Auto-seed if database is empty ──────────────────────────────────────
+  // ── Clean & Seed on start ───────────────────────────────────────────────
   const dataSource = app.get(DataSource);
-  const productCount = await dataSource.getRepository('Product').count();
-  if (productCount === 0) {
-    console.log('📦 Database is empty — running seed automatically...');
-    const seedService = app.get(SeedService);
-    await seedService.seed();
-  }
+  console.log('🗑️ Dropping schema to clear all data...');
+  await dataSource.synchronize(true); // true = drop schema and recreate
+
+  console.log('📦 Running seed automatically...');
+  const seedService = app.get(SeedService);
+  await seedService.seed();
 
   await app.listen(port);
   console.log(`🚀 Backend running at http://localhost:${port}`);

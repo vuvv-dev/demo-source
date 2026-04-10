@@ -138,10 +138,10 @@ export default function ProductCard({ product, viewMode = 'grid' }: ProductCardP
 
   // ── Grid view (default)
   return (
-    <Link href={`/products/${product.slug}`} className="group block animate-scale-in">
-      <article className="product-card group/card bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
+    <Link href={`/products/${product.slug}`} className="group block h-full animate-scale-in">
+      <article className="product-card h-full flex flex-col group/card bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
         {/* Image */}
-        <div className="card-image group/img">
+        <div className="card-image group/img relative w-full aspect-[4/3] bg-[#f5f5f7]">
           <Image
             src={product.images[0] || 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400'}
             alt={product.name}
@@ -158,11 +158,7 @@ export default function ProductCard({ product, viewMode = 'grid' }: ProductCardP
             <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-[#1d1d1f]/80 backdrop-blur-sm text-white text-[10px] font-semibold z-10">
               {product.extraMetadata.badge}
             </div>
-          ) : (
-            <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-[#1d1d1f]/80 backdrop-blur-sm text-white text-[10px] font-semibold z-10">
-              Mới
-            </div>
-          )}
+          ) : null}
 
           <button
             onClick={handleWishlist}
@@ -201,8 +197,10 @@ export default function ProductCard({ product, viewMode = 'grid' }: ProductCardP
         </div>
 
         {/* Content */}
-        <div className="p-4">
-          <span className="pill pill-gray text-[10px]">{product.category?.name}</span>
+        <div className="p-4 flex flex-col flex-1">
+          <div>
+            <span className="pill pill-gray text-[10px]">{product.category?.name}</span>
+          </div>
 
           <h3 className="mt-2 text-sm font-semibold text-[#1d1d1f] line-clamp-2 leading-snug min-h-[2.5rem] group-hover:text-[#0071e3] transition-colors">
             {product.name}
@@ -230,8 +228,8 @@ export default function ProductCard({ product, viewMode = 'grid' }: ProductCardP
             )}
           </div>
 
-          <div className="mt-3 flex items-end justify-between">
-            <div>
+          <div className="mt-auto pt-3 flex items-end justify-between">
+            <div className="min-h-[44px] flex flex-col justify-end">
               <p className="text-base font-bold text-[#1d1d1f]">{formatPrice(product.price as number)}</p>
               {product.originalPrice && (
                 <p className="text-[11px] text-[#86868b] line-through mt-0.5">{formatPrice(product.originalPrice as number)}</p>
