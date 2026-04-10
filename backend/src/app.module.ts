@@ -26,6 +26,7 @@ import { Address } from './addresses/address.entity';
 import { AddressesModule } from './addresses/addresses.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { SeedModule } from './seed/seed.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { SeedModule } from './seed/seed.module';
     PaymentModule,
     AddressesModule,
     SeedModule,
+    HealthModule,
   ],
 })
 export class AppModule implements NestModule {
