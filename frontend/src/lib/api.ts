@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/authStore';
 
-const api = axios.create({ baseURL: 'http://localhost:3001/api', timeout: 15000 });
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
+const api = axios.create({ baseURL: API_BASE, timeout: 15000 });
 
 let isRefreshing = false;
 let refreshQueue: Array<(token: string) => void> = [];
@@ -48,7 +49,7 @@ api.interceptors.response.use(
       }
 
       try {
-        const res = await axios.post('http://localhost:3001/api/auth/refresh', {}, {
+        const res = await api.post('/auth/refresh', {}, {
           headers: { Authorization: `Bearer ${refreshToken}` },
         });
         const { accessToken, refreshToken: newRT } = res.data.data;
