@@ -284,9 +284,9 @@ jobs:
             EOF
 
             # Validate and reload nginx
-            if ! nginx -t 2>&1 | grep -q "syntax is ok"; then
-              echo "[ERROR] Nginx config invalid:"
-              nginx -t
+            # nginx -t writes to stderr; check exit code directly (0 = ok)
+            if ! nginx -t 2>&1; then
+              echo "[ERROR] Nginx config invalid. Output above."
               exit 1
             fi
 
@@ -425,9 +425,9 @@ jobs:
             EOF
 
             # Validate and reload
-            if ! nginx -t 2>&1 | grep -q "syntax is ok"; then
-              echo "[ERROR] Restored nginx config invalid:"
-              nginx -t
+            # nginx -t writes to stderr; check exit code directly (0 = ok)
+            if ! nginx -t 2>&1; then
+              echo "[ERROR] Restored nginx config invalid. Output above."
               exit 1
             fi
 
