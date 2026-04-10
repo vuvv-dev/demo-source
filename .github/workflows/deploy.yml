@@ -97,7 +97,8 @@ jobs:
             DOMAIN="${{ env.DOMAIN }}"
             WEBROOT="${{ env.WEBROOT }}"
             REGISTRY="${{ env.REGISTRY }}"
-            IMAGE_NAME="${{ env.IMAGE_NAME }}"
+            RAW_IMAGE_NAME="${{ env.IMAGE_NAME }}"
+            IMAGE_NAME=$(echo "$RAW_IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
             IMAGE_TAG="${{ needs.build-and-push.outputs.IMAGE_TAG }}"
             NGINX_HTTP="${{ env.NGINX_HTTP }}"
             NGINX_HTTPS="${{ env.NGINX_HTTPS }}"
@@ -108,13 +109,13 @@ jobs:
 
             echo "=== Deploying: SHA=$IMAGE_TAG ==="
 
-            mkdir -p "$DEPLOY_DIR" "$DEPLOY_DIR/nginx" "$WEBROOT"
-            mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+            sudo mkdir -p "$DEPLOY_DIR" "$DEPLOY_DIR/nginx" "$WEBROOT"
+            sudo mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
 
             # ── Env files ───────────────────────────────────────────
-            printf '%s\n' "${{ secrets.FRONTEND_ENV }}" > "$DEPLOY_DIR/.env.frontend"
-            printf '%s\n' "${{ secrets.BACKEND_ENV }}" > "$DEPLOY_DIR/.env.backend"
-            chmod 600 "$DEPLOY_DIR/.env.frontend" "$DEPLOY_DIR/.env.backend"
+            printf '%s\n' "${{ secrets.FRONTEND_ENV }}" | sudo tee "$DEPLOY_DIR/.env.frontend" > /dev/null
+            printf '%s\n' "${{ secrets.BACKEND_ENV }}" | sudo tee "$DEPLOY_DIR/.env.backend" > /dev/null
+            sudo chmod 600 "$DEPLOY_DIR/.env.frontend" "$DEPLOY_DIR/.env.backend"
             echo "Env files written."
 
             # ── Docker compose ───────────────────────────────────────
@@ -124,7 +125,7 @@ jobs:
             DOMAIN="$DOMAIN" \
               envsubst '${REGISTRY} ${IMAGE_NAME} ${IMAGE_TAG} ${DOMAIN}' \
               < "$DEPLOY_DIR/docker-compose.prod.yml" \
-              > "$DEPLOY_DIR/docker-compose.yml"
+              | sudo tee "$DEPLOY_DIR/docker-compose.yml" > /dev/null
             echo "docker-compose.yml rendered."
 
             # ── Nginx SSL setup ──────────────────────────────────────
@@ -132,31 +133,28 @@ jobs:
             NGINX_ENABLED="/etc/nginx/sites-enabled/$DOMAIN"
 
             # 1. Backup & symlink
-            cp "$NGINX_CONF" "$NGINX_CONF.bak" 2>/dev/null || true
+            sudo cp "$NGINX_CONF" "$NGINX_CONF.bak" 2>/dev/null || true
             if [ ! -L "$NGINX_ENABLED" ]; then
-              ln -sf "$NGINX_CONF" "$NGINX_ENABLED"
+              sudo ln -sf "$NGINX_CONF" "$NGINX_ENABLED"
             fi
 
             # 2. ACME-only config
-            DOMAIN="$DOMAIN" WEBROOT="$WEBROOT" \
-              envsubst '${DOMAIN} ${WEBROOT}' \
-              > "$NGINX_CONF" << 'ACMEEOF'
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${DOMAIN};
-    location /.well-known/acme-challenge/ {
-        root ${WEBROOT};
-    }
-    location / { return 503; }
-}
-ACMEEOF
+            ACME_CONF="server {
+                listen ${NGINX_HTTP};
+                listen [::]:${NGINX_HTTP};
+                server_name ${DOMAIN};
+                location /.well-known/acme-challenge/ {
+                    root ${WEBROOT};
+                }
+                location / { return 503; }
+            }"
+            echo "$ACME_CONF" | sudo tee "$NGINX_CONF" > /dev/null
 
-            nginx -t && systemctl reload nginx || nginx -t && nginx -s reload
+            sudo nginx -t && (sudo systemctl reload nginx || sudo nginx -s reload)
             sleep 3
 
             # 3. Certbot
-            if certbot certonly --webroot -w "$WEBROOT" -d "$DOMAIN" \
+            if sudo certbot certonly --webroot -w "$WEBROOT" -d "$DOMAIN" \
                --email "$SSL_EMAIL" --agree-tos --non-interactive 2>&1 | grep -q "Certificate is saved"; then
               echo "SSL cert obtained."
             else
@@ -164,63 +162,60 @@ ACMEEOF
             fi
 
             # 4. Full SSL config
-            DOMAIN="$DOMAIN" WEBROOT="$WEBROOT" \
-            BACKEND_PORT="$BACKEND_PORT" FRONTEND_PORT="$FRONTEND_PORT" \
-              envsubst '${DOMAIN} ${WEBROOT} ${BACKEND_PORT} ${FRONTEND_PORT}' \
-              > "$NGINX_CONF" << 'SSLEOF'
-upstream demo_backend { server 127.0.0.1:${BACKEND_PORT}; keepalive 32; }
-upstream demo_frontend { server 127.0.0.1:${FRONTEND_PORT}; keepalive 32; }
+            SSL_CONF="upstream demo_backend { server 127.0.0.1:${BACKEND_PORT}; keepalive 32; }
+            upstream demo_frontend { server 127.0.0.1:${FRONTEND_PORT}; keepalive 32; }
 
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${DOMAIN};
-    location /.well-known/acme-challenge/ { root ${WEBROOT}; }
-    location / { return 301 https://$server_name$request_uri; }
-}
+            server {
+                listen ${NGINX_HTTP};
+                listen [::]:${NGINX_HTTP};
+                server_name ${DOMAIN};
+                location /.well-known/acme-challenge/ { root ${WEBROOT}; }
+                location / { return 301 https://\$server_name\$request_uri; }
+            }
 
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name ${DOMAIN};
-    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
-    ssl_session_timeout 1d;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    add_header Strict-Transport-Security "max-age=63072000" always;
-    client_max_body_size 50M;
+            server {
+                listen ${NGINX_HTTPS} ssl http2;
+                listen [::]:${NGINX_HTTPS} ssl http2;
+                server_name ${DOMAIN};
+                ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+                ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+                ssl_session_timeout 1d;
+                ssl_protocols TLSv1.2 TLSv1.3;
+                add_header Strict-Transport-Security \"max-age=63072000\" always;
+                client_max_body_size 50M;
 
-    location /api/ {
-        proxy_pass http://demo_backend/api/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-    location / {
-        proxy_pass http://demo_frontend;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-SSLEOF
+                location /api/ {
+                    proxy_pass http://demo_backend/api/;
+                    proxy_http_version 1.1;
+                    proxy_set_header Host \$host;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
+                }
+                location / {
+                    proxy_pass http://demo_frontend;
+                    proxy_http_version 1.1;
+                    proxy_set_header Host \$host;
+                    proxy_set_header X-Real-IP \$remote_addr;
+                    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto \$scheme;
+                }
+            }"
+            echo "$SSL_CONF" | sudo tee "$NGINX_CONF" > /dev/null
 
-            nginx -t && systemctl reload nginx || nginx -t && nginx -s reload
+            sudo nginx -t && (sudo systemctl reload nginx || sudo nginx -s reload)
             echo "Nginx SSL config applied."
 
             # ── Docker ───────────────────────────────────────────────
             cd "$DEPLOY_DIR"
-            docker login "$REGISTRY" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
-            docker compose down 2>/dev/null || true
-            docker compose up -d --remove-orphans
+            sudo docker login "$REGISTRY" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+            sudo docker compose down 2>/dev/null || true
+            sudo docker compose up -d --remove-orphans
             echo "Containers started."
-            docker ps --filter "name=demo-"
+            sudo docker ps --filter "name=demo-"
 
             echo ""
             echo "=== Done ==="
             echo "Frontend: https://$DOMAIN"
             echo "API:      https://$DOMAIN/api"
+
