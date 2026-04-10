@@ -208,6 +208,8 @@ jobs:
             else
               echo "[WARN] SSL cert not found at $CERT_FILE."
               echo "Keeping ACME-only config. Will retry on next deploy."
+            fi
+
             # ── Docker ───────────────────────────────────────────────
             cd "$DEPLOY_DIR"
             sudo docker login "$REGISTRY" -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
