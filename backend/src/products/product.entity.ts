@@ -32,6 +32,10 @@ export class Product {
   @Column({ default: 0 })
   sold: number;
 
+  /** Lower number = shown first. e.g. iPhone 17 = 170, iPhone 16 = 160, iPhone 15 = 150 */
+  @Column({ name: 'display_order', type: 'int', default: 0 })
+  displayOrder: number;
+
   @Column({ default: true })
   isActive: boolean;
 

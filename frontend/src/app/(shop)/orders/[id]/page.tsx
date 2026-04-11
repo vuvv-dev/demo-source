@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ChevronLeft, Package, Truck, CreditCard, Phone, CheckCircle, Clock, XCircle, ShoppingBag, MessageSquare, MapPin } from 'lucide-react';
 import { Order } from '@/types';
-import { formatPrice, formatDate } from '@/lib/utils';
+import { formatPrice, formatDate, stripHtml } from '@/lib/utils';
 import { ordersApi, paymentsApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 
@@ -230,7 +230,7 @@ export default function OrderDetailPage() {
             {order.items[0]?.product?.description && (
               <div className="px-5 py-3 bg-[#fafafa] border-b border-[#f0f0f0]">
                 <p className="text-[12px] text-[#86868b] leading-relaxed italic line-clamp-2">
-                  {order.items[0].product.description}
+                  {stripHtml(order.items[0].product.description)}
                 </p>
               </div>
             )}
@@ -254,7 +254,9 @@ export default function OrderDetailPage() {
                     </Link>
                     <p className="text-[12px] text-[#86868b] mt-0.5">Qty: {item.quantity} × {formatPrice(item.price)}</p>
                     {item.product?.description && (
-                      <p className="text-[11px] text-[#86868b] line-clamp-1 leading-relaxed mt-0.5">{item.product.description}</p>
+                      <p className="text-[11px] text-[#86868b] line-clamp-1 leading-relaxed mt-0.5">
+                        {stripHtml(item.product.description)}
+                      </p>
                     )}
                   </div>
                   <p className="text-[14px] font-bold text-[#1d1d1f] shrink-0">{formatPrice(item.price * item.quantity)}</p>

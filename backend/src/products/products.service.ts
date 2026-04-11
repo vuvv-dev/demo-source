@@ -26,7 +26,7 @@ export class ProductsService {
       categorySlug,
       minPrice,
       maxPrice,
-      sortBy = 'popular',
+      sortBy = 'newest',
       order = 'desc',
       minRating,
       inStock = 'all',
@@ -78,11 +78,15 @@ export class ProductsService {
         // Sort after ratingMap is available (see post-processing below)
         break;
       case 'sold':
-        qb.orderBy('p.sold', dir).addOrderBy('p.name', dir === 'ASC' ? 'ASC' : 'DESC');
+        qb.orderBy('p.displayOrder', dir)
+          .addOrderBy('p.sold', dir)
+          .addOrderBy('p.name', dir === 'ASC' ? 'ASC' : 'DESC');
         break;
       case 'popular':
       default:
-        qb.orderBy('p.sold', 'DESC').addOrderBy('p.createdAt', 'DESC');
+        qb.orderBy('p.displayOrder', 'DESC')
+          .addOrderBy('p.sold', 'DESC')
+          .addOrderBy('p.createdAt', 'DESC');
         break;
     }
 
@@ -177,6 +181,7 @@ export class ProductsService {
       images: product.images,
       stock: product.stock,
       sold: product.sold,
+      displayOrder: product.displayOrder,
       isActive: product.isActive,
       specs: product.specs,
       tagline: product.tagline,
@@ -191,10 +196,10 @@ export class ProductsService {
   }
 
   async create(dto: CreateProductDto) {
-    const { categoryId, ...rest } = dto;
+    const { categoryId, displayOrder, ...rest } = dto;
     const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
     if (!category) throw new NotFoundException('Danh mục không tồn tại');
-    const product = this.repo.create({ ...rest, category });
+    const product = this.repo.create({ ...rest, category, displayOrder: displayOrder ?? 0 });
     const data = await this.repo.save(product);
     return { data, success: true, message: 'Tạo sản phẩm thành công' };
   }
@@ -202,12 +207,13 @@ export class ProductsService {
   async update(id: string, dto: Partial<CreateProductDto>) {
     const product = await this.repo.findOne({ where: { id } });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
-    const { categoryId, ...rest } = dto;
+    const { categoryId, displayOrder, ...rest } = dto;
     if (categoryId) {
       const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
       if (category) product.category = category;
     }
     Object.assign(product, rest);
+    if (displayOrder !== undefined) product.displayOrder = displayOrder;
     const data = await this.repo.save(product);
     return { data, success: true };
   }

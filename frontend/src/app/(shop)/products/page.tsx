@@ -13,7 +13,6 @@ import Link from 'next/link';
 const LIMIT = 12;
 
 const SORT_OPTIONS = [
-  { value: 'popular', label: 'Phổ biến nhất' },
   { value: 'newest', label: 'Mới nhất' },
   { value: 'rating', label: 'Đánh giá cao nhất' },
   { value: 'sold', label: 'Bán chạy nhất' },
@@ -74,7 +73,7 @@ function ProductsContent() {
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('categorySlug') || '');
-  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'popular');
+  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'newest');
   const [order, setOrder] = useState(searchParams.get('order') || 'desc');
   const [minPrice, setMinPrice] = useState(searchParams.get('minPrice') || '');
   const [maxPrice, setMaxPrice] = useState(searchParams.get('maxPrice') || '');
@@ -124,14 +123,14 @@ function ProductsContent() {
       .then(r => { setProducts(r.data.data); setTotal(r.data.total); })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, debouncedSearch, selectedCategory, sortBy, order, minPrice, maxPrice, minRating, inStock]);
 
   // ── Sync from URL when navigating via client-side navigation
   useEffect(() => {
     const cat = searchParams.get('categorySlug') || '';
     const sr = searchParams.get('search') || '';
-    const sb = searchParams.get('sortBy') || 'popular';
+    const sb = searchParams.get('sortBy') || 'newest';
     const ord = searchParams.get('order') || 'desc';
     const mp = searchParams.get('minPrice') || '';
     const Ma = searchParams.get('maxPrice') || '';
@@ -144,7 +143,7 @@ function ProductsContent() {
     setMinPrice(mp); setMaxPrice(Ma);
     setMinRating(mr); setInStock(st);
     setPage(pg);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   useEffect(() => { categoriesApi.list().then(r => setCategories(r.data.data)); }, []);
@@ -162,7 +161,7 @@ function ProductsContent() {
   const clearAll = () => {
     setSearch(''); setDebouncedSearch('');
     setSelectedCategory('');
-    setSortBy('popular'); setOrder('desc');
+    setSortBy('newest'); setOrder('desc');
     setMinPrice(''); setMaxPrice('');
     setMinRating(null); setInStock('all');
     setPage(1);
@@ -170,14 +169,14 @@ function ProductsContent() {
 
   const removeFilter = (type: string, val?: string) => {
     switch (type) {
-      case 'search':     setSearch(''); setDebouncedSearch(''); setPage(1); break;
-      case 'category':   setSelectedCategory(''); setPage(1); break;
-      case 'sort':       setSortBy('popular'); setPage(1); break;
-      case 'order':      setOrder('desc'); setPage(1); break;
-      case 'minPrice':   setMinPrice(''); setPage(1); break;
-      case 'maxPrice':   setMaxPrice(''); setPage(1); break;
-      case 'rating':     setMinRating(null); setPage(1); break;
-      case 'stock':      setInStock('all'); setPage(1); break;
+      case 'search': setSearch(''); setDebouncedSearch(''); setPage(1); break;
+      case 'category': setSelectedCategory(''); setPage(1); break;
+      case 'sort': setSortBy('popular'); setPage(1); break;
+      case 'order': setOrder('desc'); setPage(1); break;
+      case 'minPrice': setMinPrice(''); setPage(1); break;
+      case 'maxPrice': setMaxPrice(''); setPage(1); break;
+      case 'rating': setMinRating(null); setPage(1); break;
+      case 'stock': setInStock('all'); setPage(1); break;
     }
   };
 
@@ -495,7 +494,7 @@ function ProductsContent() {
                       className={`w-9 h-9 rounded-xl text-sm font-medium transition-colors ${p === page
                         ? 'bg-[#0071e3] text-white border border-[#0071e3]'
                         : 'border border-[#e5e5e7] text-[#1d1d1f] bg-white hover:bg-[#f5f5f7]'
-                      }`}
+                        }`}
                     >
                       {p}
                     </button>

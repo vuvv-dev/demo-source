@@ -66,11 +66,10 @@ export default function ProductSpecsAccordion({ description, boxContent, specs }
             isOpen={openItems['overview']}
             onToggle={() => toggle('overview')}
           >
-            <div className="max-w-3xl space-y-6 text-[#86868b] font-normal">
-              {description.split('. ').map((p, i) => (
-                <p key={i}>{p}.</p>
-              ))}
-            </div>
+            <div 
+              className="rich-description"
+              dangerouslySetInnerHTML={{ __html: description }}
+            />
           </AccordionItem>
 
           {boxContent && (

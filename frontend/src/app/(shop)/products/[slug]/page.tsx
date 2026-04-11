@@ -442,11 +442,10 @@ function AccordionSection({
         isOpen={!!openItems['overview']}
         onToggle={() => toggle('overview')}
       >
-        <div className="space-y-5 text-[#86868b] leading-relaxed">
-          {product.description.split('. ').filter(Boolean).map((p, i) => (
-            <p key={i}>{p}.</p>
-          ))}
-        </div>
+        <div 
+          className="rich-description"
+          dangerouslySetInnerHTML={{ __html: product.description }}
+        />
       </AccordionItem>
 
       {/* Box */}

@@ -17,4 +17,5 @@ export class CreateProductDto {
   @IsOptional() @IsString() featuredImage?: string;
   @IsOptional() @IsString() whatsInTheBox?: string;
   @IsOptional() @IsObject() extraMetadata?: Record<string, any>;
+  @IsOptional() @IsNumber() @Type(() => Number) displayOrder?: number;
 }

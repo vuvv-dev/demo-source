@@ -75,7 +75,13 @@
       "Bash(ls /d/a_project/docimal/docimal-client/nginx*)",
       "Read(//d/a_project/docimal/docimal-core/**)",
       "WebFetch(domain:cellphones.com.vn)",
-      "WebFetch(domain:hoanghamobile.com)"
+      "WebFetch(domain:hoanghamobile.com)",
+      "Bash('a[href*=\\\\\"/iphone/\\\\\"]')",
+      "Bash(el)",
+      "Bash('title')",
+      "Bash('script[type=application/ld+json]')",
+      "Bash('body')",
+      "Bash(npx ts-node:*)"
     ]
   }
 }
