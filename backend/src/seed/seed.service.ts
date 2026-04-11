@@ -210,13 +210,13 @@ export class SeedService implements OnModuleInit {
     const catMap = Object.fromEntries(cats.map(c => [c.slug, c]));
 
     const generators = [
-      { name: 'iPhone',       gen: () => this.genIPhones(catMap['iphone']) },
-      { name: 'Mac',          gen: () => this.genMacs(catMap['mac']) },
-      { name: 'iPad',         gen: () => this.genIPads(catMap['ipad']) },
-      { name: 'Apple Watch',  gen: () => this.genWatches(catMap['apple-watch']) },
-      { name: 'AirPods',      gen: () => this.genAirPods(catMap['airpods']) },
-      { name: 'Phụ Kiện',     gen: () => this.genAccessories(catMap['phu-kien']) },
-      { name: 'TV & Giải Trí',gen: () => this.genTV(catMap['tv']) },
+      { name: 'iPhone', gen: () => this.genIPhones(catMap['iphone']) },
+      { name: 'Mac', gen: () => this.genMacs(catMap['mac']) },
+      { name: 'iPad', gen: () => this.genIPads(catMap['ipad']) },
+      { name: 'Apple Watch', gen: () => this.genWatches(catMap['apple-watch']) },
+      { name: 'AirPods', gen: () => this.genAirPods(catMap['airpods']) },
+      { name: 'Phụ Kiện', gen: () => this.genAccessories(catMap['phu-kien']) },
+      { name: 'TV & Giải Trí', gen: () => this.genTV(catMap['tv']) },
     ];
 
     let totalSeeded = 0;
@@ -2101,8 +2101,7 @@ export class SeedService implements OnModuleInit {
           { name: 'Dung lượng', value: '1TB', priceModifier: 12000000, stock: 5 },
           { name: 'Màu sắc', value: 'Xanh Mước', colorHex: '#8fbc8f', stock: 15 },
           { name: 'Màu sắc', value: 'Đen', colorHex: '#1d1d1f', stock: 15 },
-          { name: 'Màu sắc', value: 'Trắng', colorHex: '#f5f5f7', stock: 15 },
-          { name: 'Màu sắc', value: 'Hồng', colorHex: '#f8c8dc', stock: 15 },
+          { name: 'Màu sắc', value: 'Màu Cam', colorHex: '#ff9f0a', stock: 15 },
         ],
         extraMetadata: {
           badge: 'Mới',
@@ -2180,6 +2179,7 @@ export class SeedService implements OnModuleInit {
           { name: 'Màu sắc', value: 'Bạc', colorHex: '#e8e4df', stock: 20 },
           { name: 'Màu sắc', value: 'Xám', colorHex: '#86868b', stock: 15 },
           { name: 'Màu sắc', value: 'Vàng', colorHex: '#f5c518', stock: 10 },
+          { name: 'Màu sắc', value: 'Màu Cam', colorHex: '#ff9f0a', stock: 12 },
         ],
         extraMetadata: {
           badge: 'Mới',
@@ -2255,6 +2255,7 @@ export class SeedService implements OnModuleInit {
           { name: 'Màu sắc', value: 'Titan Đen', colorHex: '#3a3a3c', stock: 10 },
           { name: 'Màu sắc', value: 'Titan Trắng', colorHex: '#e8e4df', stock: 10 },
           { name: 'Màu sắc', value: 'Titan Xám', colorHex: '#9a9a9a', stock: 8 },
+          { name: 'Màu sắc', value: 'Titan Sa Mạc', colorHex: '#c4a882', stock: 10 },
         ],
         extraMetadata: {
           badge: 'Mới',
@@ -2335,6 +2336,7 @@ export class SeedService implements OnModuleInit {
           { name: 'Màu sắc', value: 'Titan Đen', colorHex: '#3a3a3c', stock: 8 },
           { name: 'Màu sắc', value: 'Titan Trắng', colorHex: '#e8e4df', stock: 7 },
           { name: 'Màu sắc', value: 'Titan Xám', colorHex: '#9a9a9a', stock: 7 },
+          { name: 'Màu sắc', value: 'Titan Sa Mạc', colorHex: '#c4a882', stock: 10 },
         ],
         extraMetadata: {
           badge: 'Mới',
@@ -2792,7 +2794,7 @@ export class SeedService implements OnModuleInit {
           promotionalCopy: 'M3 3nm — Ray tracing hardware-accelerated',
         },
       },
-      
+
       {
         name: 'Mac mini M2', slug: 'mac-mini-m2',
         tagline: 'M2. Nhỏ. Mạnh. Đáng sở hữu.', shortDescription: 'Chip M2 — 8 lõi — HDMI + Ethernet',
@@ -2999,7 +3001,7 @@ export class SeedService implements OnModuleInit {
           promotionalCopy: 'M2 Ultra — Desktop powerhouse thực sự',
         },
       },
-            {
+      {
         name: 'iMac 24" M4', slug: 'imac-24-m4',
         tagline: 'Làm nhiều hơn. Màu sắc hơn.', shortDescription: 'M4 — Màn hình 4.5K — 7 màu sắc',
         price: 28990000, originalPrice: 30990000,
