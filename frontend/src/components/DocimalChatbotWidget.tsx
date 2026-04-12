@@ -8,10 +8,10 @@ const DocimalChatbot = dynamic(
 );
 
 export function DocimalChatbotWidget() {
-  const apiKey = process.env.dcml_pk_187662575c0491702a6d7fb61fb02d8a91919cbf0311fcdf;
+  const apiKey = "dcml_pk_187662575c0491702a6d7fb61fb02d8a91919cbf0311fcdf";
   const apiBaseUrl = process.env.NEXT_PUBLIC_DOCIMAL_API_URL || 'https://api.docimal.site';
 
-  if (!apiKey || apiKey === 'dcml_pk_187662575c0491702a6d7fb61fb02d8a91919cbf0311fcdf') return null;
+  if (!apiKey) return null;
 
   return (
     <DocimalChatbot
