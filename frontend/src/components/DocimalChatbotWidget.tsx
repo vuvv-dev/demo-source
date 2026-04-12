@@ -36,7 +36,7 @@ export function DocimalChatbotWidget() {
       // Docimal automation tools read these to make authenticated calls back to SMobile API
       metadata={{
         // Authorization header value — use directly as {{user.metadata.apiToken}} in HTTP card
-        ...(token && { apiToken: `Bearer ${token}` }),
+        ...(token && { apiToken: `${token}` }),
         // SMobile backend URL that the integration tool targets
         // Use as {{user.metadata.apiBaseUrl}} in HTTP card baseUrl field
         apiBaseUrl: smobileApiUrl,
