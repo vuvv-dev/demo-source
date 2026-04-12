@@ -81,7 +81,8 @@
       "Bash('title')",
       "Bash('script[type=application/ld+json]')",
       "Bash('body')",
-      "Bash(npx ts-node:*)"
+      "Bash(npx ts-node:*)",
+      "Bash(docker start:*)"
     ]
   }
 }

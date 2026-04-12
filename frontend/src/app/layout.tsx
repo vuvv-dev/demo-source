@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Toaster } from 'react-hot-toast';
 import './globals.css';
 import { Providers } from './providers';
+import { DocimalChatbotWidget } from '@/components/DocimalChatbotWidget';
 
 export const metadata: Metadata = {
   title: 'AppleStore - Cửa hàng Apple chính hãng',
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           {children}
           <Toaster position="top-right" toastOptions={{ style: { borderRadius: '12px', fontFamily: 'inherit' } }} />
+          <DocimalChatbotWidget />
         </Providers>
       </body>
     </html>
